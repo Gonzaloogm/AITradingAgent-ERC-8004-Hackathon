@@ -1,0 +1,3 @@
+[console_scripts]
+erc8004-deploy = scripts.deploy_agent:main
+erc8004-setup = scripts.quick_setup:main

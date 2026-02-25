@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TEE Agent - Wallet Funding</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="/static/wallet-utils.js"></script>
+    <script src="/static/trust-center.js"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">TEE Agent Wallet Funding</h1>
+                <p class="text-gray-400">Fund your agent wallet to enable on-chain registration</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="/dashboard" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm">Dashboard</a>
+                <a href="/developer" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm">Developer API</a>
+            </div>
+        </div>
+
+        <div id="loading" class="text-center py-20">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+            <p class="mt-4 text-gray-400">Loading wallet...</p>
+        </div>
+
+        <div id="content" class="hidden">
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Wallet Address</h2>
+                <div class="flex items-center gap-4 mb-4">
+                    <code id="address" class="flex-1 bg-gray-700 p-3 rounded text-sm break-all"></code>
+                    <button onclick="copyAddress()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">Copy</button>
+                </div>
+                <div id="qrcode" class="flex justify-center my-6"></div>
+            </div>
+
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Balance</h2>
+                <div class="text-3xl font-mono mb-2">
+                    <span id="balance">0</span> <span class="text-gray-400 text-xl">ETH</span>
+                </div>
+                <div class="text-sm text-gray-400 mb-4">
+                    Minimum required: <span id="minBalance">0.001</span> ETH
+                </div>
+                <div id="status" class="flex items-center gap-2">
+                    <div id="statusDot" class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span id="statusText">Waiting for funds...</span>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Network Info</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-gray-400 text-sm">Chain</p>
+                        <p id="chainName" class="font-mono text-gray-500">Loading...</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400 text-sm">Chain ID</p>
+                        <p id="chainId" class="font-mono text-gray-500">Loading...</p>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <p class="text-gray-400 text-sm mb-2">Get testnet ETH:</p>
+                    <a href="#" target="_blank"
+                       class="text-blue-400 hover:text-blue-300">Faucet →</a>
+                </div>
+            </div>
+
+            <!-- Wallet Connection & Transfer Section -->
+            <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Send Funds from Your Wallet</h2>
+
+                <div id="walletNotConnected">
+                    <p class="text-gray-400 text-sm mb-4">Connect your MetaMask wallet to send ETH directly to the agent wallet</p>
+                    <button onclick="connectWallet()" class="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-bold transition">
+                        Connect Wallet
+                    </button>
+                </div>
+
+                <div id="walletConnected" class="hidden">
+                    <div class="mb-4 p-3 bg-gray-700 rounded">
+                        <p class="text-sm text-gray-400">Connected Wallet</p>
+                        <p id="connectedAddress" class="font-mono text-sm"></p>
+                        <p class="text-sm text-gray-400 mt-1">Balance: <span id="userBalance" class="text-white">0</span> ETH</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm text-gray-400 mb-2">Amount to Send (ETH)</label>
+                        <div class="flex gap-2">
+                            <input
+                                type="number"
+                                id="sendAmount"
+                                step="0.001"
+                                min="0.001"
+                                placeholder="0.01"
+                                class="flex-1 bg-gray-700 text-white p-3 rounded"
+                            />
+                            <button onclick="setAmount(0.001)" class="bg-gray-700 hover:bg-gray-600 px-3 rounded text-sm">Min</button>
+                            <button onclick="setAmount(0.01)" class="bg-gray-700 hover:bg-gray-600 px-3 rounded text-sm">0.01</button>
+                            <button onclick="setAmount(0.1)" class="bg-gray-700 hover:bg-gray-600 px-3 rounded text-sm">0.1</button>
+                        </div>
+                    </div>
+
+                    <div id="transferStatus" class="mb-4"></div>
+
+                    <div class="flex gap-2">
+                        <button
+                            onclick="sendFunds()"
+                            id="sendBtn"
+                            class="flex-1 bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg font-bold transition">
+                            Send ETH
+                        </button>
+                        <button
+                            onclick="disconnectWallet()"
+                            class="bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-lg">
+                            Disconnect
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <button id="continueBtn" disabled
+                    class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-bold text-lg transition">
+                Continue to Registration
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let walletData = null;
+        let pollInterval = null;
+        let chainConfig = null;
+        let walletManager = null;
+        const apiClient = new APIClient();
+
+        async function initializeChainConfig() {
+            const result = await apiClient.getChainConfig();
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            chainConfig = result.data;
+            return chainConfig;
+        }
+
+        async function loadWallet() {
+            try {
+                // Load chain config first
+                chainConfig = await initializeChainConfig();
+
+                // Initialize wallet manager with chain config
+                walletManager = new WalletManager(chainConfig);
+
+                const result = await apiClient.getWallet();
+
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+
+                walletData = result.data;
+
+                document.getElementById('address').textContent = walletData.address;
+
+                // Update chain info and remove loading style
+                const chainNameEl = document.getElementById('chainName');
+                chainNameEl.textContent = walletData.chain_name;
+                chainNameEl.classList.remove('text-gray-500');
+
+                const chainIdEl = document.getElementById('chainId');
+                chainIdEl.textContent = walletData.chain_id;
+                chainIdEl.classList.remove('text-gray-500');
+
+                document.getElementById('minBalance').textContent = walletData.minimum_balance;
+
+                // Update faucet link dynamically
+                if (chainConfig.faucet_url) {
+                    // Find the faucet link in the Network Info section
+                    const faucetLink = document.querySelector('.bg-gray-800 a.text-blue-400');
+                    if (faucetLink) {
+                        faucetLink.href = chainConfig.faucet_url;
+                        faucetLink.textContent = `${chainConfig.chain_name} Faucet →`;
+                    }
+                }
+
+                new QRCode(document.getElementById('qrcode'), {
+                    text: walletData.qr_code_data,
+                    width: 200,
+                    height: 200
+                });
+
+                updateBalance();
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+
+                pollInterval = setInterval(updateBalance, 5000);
+            } catch (err) {
+                console.error('Failed to load wallet:', err);
+                document.getElementById('loading').innerHTML = '<p class="text-red-400">Failed to load wallet: ' + err.message + '</p>';
+            }
+        }
+
+        async function updateBalance() {
+            try {
+                const result = await apiClient.getWallet();
+
+                if (!result.success) {
+                    console.error('Failed to update balance:', result.error);
+                    return;
+                }
+
+                const data = result.data;
+                document.getElementById('balance').textContent = UIUtils.formatEth(data.balance);
+
+                if (data.funded) {
+                    document.getElementById('statusDot').className = 'w-3 h-3 rounded-full bg-green-500';
+                    document.getElementById('statusText').textContent = 'Wallet funded ✓';
+                    document.getElementById('continueBtn').disabled = false;
+                    clearInterval(pollInterval);
+                } else {
+                    document.getElementById('statusDot').className = 'w-3 h-3 rounded-full bg-red-500';
+                    document.getElementById('statusText').textContent = 'Waiting for funds...';
+                }
+            } catch (err) {
+                console.error('Failed to update balance:', err);
+            }
+        }
+
+        async function copyAddress() {
+            const success = await UIUtils.copyToClipboard(walletData.address);
+            if (success) {
+                UIUtils.showToast('Address copied to clipboard!', 'success');
+            } else {
+                UIUtils.showToast('Failed to copy address', 'error');
+            }
+        }
+
+        async function connectWallet() {
+            try {
+                const address = await walletManager.connect();
+                document.getElementById('connectedAddress').textContent = UIUtils.formatAddress(address);
+
+                // Get user's balance
+                const balance = await walletManager.getBalance(address);
+                document.getElementById('userBalance').textContent = UIUtils.formatEth(balance);
+
+                // Show connected UI
+                document.getElementById('walletNotConnected').classList.add('hidden');
+                document.getElementById('walletConnected').classList.remove('hidden');
+
+                UIUtils.showToast('Wallet connected successfully!', 'success');
+            } catch (error) {
+                console.error('Failed to connect wallet:', error);
+                UIUtils.showToast(error.message, 'error');
+            }
+        }
+
+        function disconnectWallet() {
+            walletManager.disconnect();
+            document.getElementById('walletNotConnected').classList.remove('hidden');
+            document.getElementById('walletConnected').classList.add('hidden');
+            UIUtils.showToast('Wallet disconnected', 'info');
+        }
+
+        function setAmount(amount) {
+            document.getElementById('sendAmount').value = amount;
+        }
+
+        async function sendFunds() {
+            const amount = parseFloat(document.getElementById('sendAmount').value);
+
+            if (!amount || amount <= 0) {
+                UIUtils.showToast('Please enter a valid amount', 'error');
+                return;
+            }
+
+            if (!walletData || !walletData.address) {
+                UIUtils.showToast('Agent wallet not loaded', 'error');
+                return;
+            }
+
+            const statusEl = document.getElementById('transferStatus');
+            const sendBtn = document.getElementById('sendBtn');
+
+            try {
+                sendBtn.disabled = true;
+                sendBtn.textContent = 'Sending...';
+                statusEl.innerHTML = '<p class="text-yellow-400">Processing transaction...</p>';
+
+                const txHash = await walletManager.sendTransaction(walletData.address, amount);
+
+                // Build block explorer URL dynamically
+                const explorerUrl = chainConfig.block_explorer_urls && chainConfig.block_explorer_urls[0]
+                    ? `${chainConfig.block_explorer_urls[0]}/tx/${txHash}`
+                    : `#`;
+
+                statusEl.innerHTML = `
+                    <p class="text-green-400 mb-2">✓ Transaction Sent!</p>
+                    <p class="text-sm text-gray-400">Hash: <a href="${explorerUrl}" target="_blank" class="text-blue-400 hover:text-blue-300">${UIUtils.formatAddress(txHash)}</a></p>
+                    <p class="text-sm text-gray-400 mt-1">Waiting for confirmation...</p>
+                `;
+
+                UIUtils.showToast('Transaction sent successfully!', 'success');
+
+                // Wait a bit and then update balance
+                setTimeout(() => {
+                    updateBalance();
+                    statusEl.innerHTML = '<p class="text-green-400">✓ Transaction confirmed!</p>';
+                }, 5000);
+
+            } catch (error) {
+                console.error('Failed to send funds:', error);
+                statusEl.innerHTML = `<p class="text-red-400">Failed to send transaction: ${error.message}</p>`;
+                UIUtils.showToast('Transaction failed: ' + error.message, 'error');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send ETH';
+            }
+        }
+
+        document.getElementById('continueBtn').addEventListener('click', () => {
+            window.location.href = '/dashboard';
+        });
+
+        loadWallet();
+    </script>
+</body>
+</html>

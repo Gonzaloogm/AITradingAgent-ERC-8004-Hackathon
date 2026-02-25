@@ -1,3 +1,58 @@
+Metadata-Version: 2.4
+Name: erc-8004-tee-agents
+Version: 0.1.0
+Summary: Streamlined SDK for building trustless TEE agents with ERC-8004
+Home-page: https://github.com/your-org/erc-8004-tee-agents
+Author: ERC-8004 Contributors
+Author-email: contact@erc8004.dev
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: web3>=6.0.0
+Requires-Dist: eth-account>=0.8.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: dstack-sdk>=0.2.0
+Requires-Dist: aiohttp>=3.8.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: typing-extensions>=4.5.0
+Requires-Dist: fastapi>=0.104.0
+Requires-Dist: uvicorn>=0.24.0
+Requires-Dist: eth-utils>=2.2.0
+Requires-Dist: agent0-sdk>=0.31.0
+Requires-Dist: gql[aiohttp]>=3.5.0
+Requires-Dist: anthropic>=0.40.0
+Provides-Extra: ai
+Requires-Dist: openai>=1.0.0; extra == "ai"
+Requires-Dist: anthropic>=0.3.0; extra == "ai"
+Requires-Dist: crewai>=0.1.0; extra == "ai"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 # ERC-8004 TEE Agent
 
 AI agent with on-chain identity (ERC-8004), TEE attestation (Intel TDX), and chat interface.
