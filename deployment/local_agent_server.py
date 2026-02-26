@@ -14,7 +14,9 @@ import asyncio
 import json
 from dotenv import load_dotenv
 
-load_dotenv()
+# Explicitly load .env from the project root (one level up from deployment/)
+_project_root = os.path.join(os.path.dirname(__file__), '..')
+load_dotenv(os.path.join(_project_root, '.env'))
 from datetime import datetime
 from typing import Dict, Any, Optional
 
