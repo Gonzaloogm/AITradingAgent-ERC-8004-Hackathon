@@ -192,7 +192,7 @@ class DeltaNeutralEngine:
             print("-" * 50)
 
         except Exception as e:
-            print(f"❌ Error al enviar la transacción: {e}")
+            print(f"❌ Error al enviar la transaccsuión: {e}")
             print("-" * 50)
     def run_loop(self):
         print("🤖 Iniciando Agente Delta-Neutral con datos en vivo...")
