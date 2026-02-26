@@ -18,6 +18,7 @@ load_dotenv()
 from datetime import datetime
 from typing import Dict, Any, Optional
 
+#python3 deployment/local_agent_server.py
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

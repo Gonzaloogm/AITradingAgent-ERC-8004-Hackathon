@@ -8,6 +8,7 @@ src/agent/base.py
 src/agent/chain_config.py
 src/agent/chat_agent.py
 src/agent/code_executor.py
+src/agent/delta_neutral.py
 src/agent/eip712.py
 src/agent/registry.py
 src/agent/session_store.py
