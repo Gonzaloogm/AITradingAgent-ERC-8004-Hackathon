@@ -18,7 +18,9 @@ from tee_auth import TEEAuthenticator
 class DeltaNeutralEngine:
     def __init__(self):
         self.is_running = True
-        
+        self.circuit_breaker_tripped = False  # Safety flag — halts trading on extreme volatility
+        self.last_price = None                # Tracks the previous spot price for swing detection
+
         print("🔑 Inicializando entorno seguro TEE...")
         private_key = os.getenv("PRIVATE_KEY")
         if not private_key:
@@ -28,9 +30,63 @@ class DeltaNeutralEngine:
         self.tee_auth = TEEAuthenticator(
             domain="localhost:8000",
             salt=os.getenv("AGENT_SALT", "default_salt"),
-            use_tee=True,
+            use_tee=False,
             private_key=private_key
         )
+
+    # ------------------------------------------------------------------
+    # CIRCUIT BREAKER
+    # ------------------------------------------------------------------
+    CIRCUIT_BREAKER_THRESHOLD_PCT = 5.0  # Max allowed price swing between checks (%)
+
+    def check_circuit_breaker(self, current_price, last_price):
+        """Trip the circuit breaker if BTC spot swings more than 5% in one loop cycle."""
+        if last_price is None:
+            return  # No previous reference — skip on the very first tick
+
+        swing_pct = abs((current_price - last_price) / last_price) * 100
+
+        print(f"🔍 Comprobación de volatilidad: swing entre ticks = {swing_pct:.4f}%")
+
+        if swing_pct > self.CIRCUIT_BREAKER_THRESHOLD_PCT:
+            self.circuit_breaker_tripped = True
+            print("=" * 60)
+            print("🚨 CIRCUIT BREAKER TRIPPED: Trading Halted")
+            print(f"   Causa: variación de precio de {swing_pct:.2f}% "
+                  f"(umbral: {self.CIRCUIT_BREAKER_THRESHOLD_PCT}%)")
+            print(f"   Precio anterior: ${last_price:,.2f}  →  Precio actual: ${current_price:,.2f}")
+            print("   Reinicia manualmente self.circuit_breaker_tripped = False para reanudar.")
+            print("=" * 60)
+
+    # ------------------------------------------------------------------
+    # POSITION SIZING
+    # ------------------------------------------------------------------
+    RISK_FRACTION = 0.10  # Allocate 10% of available capital per trade
+
+    def get_available_capital(self):
+        """Fetch the agent wallet's native ETH balance from the chain.
+        Returns the balance in ETH (float). Falls back to a 10 ETH mock
+        if the RPC client is not connected or not yet initialised."""
+        try:
+            rpc_url = os.getenv("RPC_URL", "https://sepolia.base.org")
+            w3_client = Web3(Web3.HTTPProvider(rpc_url))
+
+            if not w3_client.is_connected():
+                raise ConnectionError("RPC not reachable")
+
+            wallet_address = w3_client.to_checksum_address(self.tee_auth.address)
+            balance_wei = w3_client.eth.get_balance(wallet_address)
+            balance_eth = w3_client.from_wei(balance_wei, "ether")
+
+            print(f"💼 Balance on-chain: {balance_eth:.6f} ETH  "
+                  f"(dirección: {wallet_address})")
+            return float(balance_eth)
+
+        except Exception as e:
+            mock_balance = 10.0  # ETH — used for local / offline testing
+            print(f"⚠️  No se pudo consultar el balance on-chain ({e}). "
+                  f"Usando balance simulado: {mock_balance} ETH")
+            return mock_balance
 
     def get_market_prices(self):
         # Conexión real a la API pública de Binance
@@ -43,25 +99,57 @@ class DeltaNeutralEngine:
             perp_url = "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
             perp_price = float(requests.get(perp_url).json()["price"])
 
-            return spot_price, perp_price
+            # Obtener la tasa de financiación actual (Funding Rate) del mercado perpetuo
+            funding_url = "https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"
+            funding_data = requests.get(funding_url).json()
+            last_funding_rate = float(funding_data["lastFundingRate"])
+
+            return spot_price, perp_price, last_funding_rate
         except Exception as e:
             print(f"⚠️ Error de conexión: {e}. Usando datos de respaldo.")
-            return 50000.00, 50030.00
+            return 50000.00, 50030.00, 0.0001
 
-    def analyze_spread(self, spot, perp):
-        # Calculamos la diferencia de precio real
+    def analyze_spread(self, spot, perp, funding_rate):
+        # --- Componentes del rendimiento esperado ---
+        EXCHANGE_FEE_PCT = 0.10  # 0.05% por cada leg (entrada + salida) = 0.10% total
+
+        # 1. Spread entre perpetuo y spot (prima del mercado)
         spread = perp - spot
         spread_pct = (spread / spot) * 100
-        
-        print(f"📊 BTC Spot: ${spot:.2f} | BTC Perp: ${perp:.2f} | Spread: {spread_pct:.4f}%")
 
-        # Ajustamos el umbral para el mercado real (ej: buscamos un spread > $2)
-        if spread > 2.00: 
-            print("🚀 ¡Oportunidad de Arbitraje detectada en el mercado real!")
-            self.create_trade_intent("LONG_SPOT_SHORT_PERP", "BTC/USDC", 1000000)
-            self.is_running = False 
+        # 2. Tasa de financiación expresada en porcentaje
+        funding_rate_pct = funding_rate * 100
+
+        # 3. Rendimiento neto = spread + funding rate - comisiones estimadas
+        net_yield_pct = spread_pct + funding_rate_pct - EXCHANGE_FEE_PCT
+
+        print("-" * 60)
+        print(f"📊 BTC Spot:          ${spot:,.2f}")
+        print(f"📊 BTC Perp:          ${perp:,.2f}")
+        print(f"📈 Spread (prima):    {spread_pct:.4f}%")
+        print(f"💸 Funding Rate:      {funding_rate_pct:.4f}% (por 8h)")
+        print(f"🏦 Comisiones est.:  -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
+        print(f"✨ Rendimiento Neto:  {net_yield_pct:.4f}%")
+        print("-" * 60)
+
+        # El bot sólo opera si el rendimiento neto es estrictamente positivo
+        if net_yield_pct > 0.00:
+            print("🚀 ¡Oportunidad de Cash-and-Carry detectada! Rendimiento neto positivo.")
+
+            # --- Dynamic position sizing (fractional risk) ---
+            available_eth   = self.get_available_capital()
+            trade_size_eth  = available_eth * self.RISK_FRACTION
+            # Convert to Wei so the EIP-712 uint256 field receives a plain integer
+            trade_amount_wei = int(Web3.to_wei(trade_size_eth, "ether"))
+
+            print(f"📐 Capital disponible: {available_eth:.6f} ETH")
+            print(f"📐 Tamaño de posición ({int(self.RISK_FRACTION*100)}%): "
+                  f"{trade_size_eth:.6f} ETH  →  {trade_amount_wei} Wei (uint256)")
+
+            self.create_trade_intent("LONG_SPOT_SHORT_PERP", "BTC/USDC", trade_amount_wei)
+            self.is_running = False
         else:
-            print("⏳ Diferencial muy bajo. Esperando...")
+            print("⏳ Rendimiento neto nulo o negativo. Esperando mejor oportunidad...")
 
     def create_trade_intent(self, action, market, amount):
         print(f"📝 Construyendo TradeIntent (EIP-712)...")
@@ -196,10 +284,21 @@ class DeltaNeutralEngine:
             print(f"❌ Error al enviar la transaccsuión: {e}")
             print("-" * 50)
     def run_loop(self):
-        print("🤖 Iniciando Agente Delta-Neutral con datos en vivo...")
+        print("🤖 Iniciando Agente Delta-Neutral (Cash-and-Carry) con datos en vivo...")
         while self.is_running:
-            spot, perp = self.get_market_prices()
-            self.analyze_spread(spot, perp)
+            spot, perp, funding_rate = self.get_market_prices()
+
+            # --- Safety check: evaluate volatility before any trade logic ---
+            self.check_circuit_breaker(spot, self.last_price)
+            self.last_price = spot  # Always update reference price
+
+            if self.circuit_breaker_tripped:
+                print("🛑 CIRCUIT BREAKER activo — omitiendo evaluación de trades.")
+                print("   Reinicia el agente o establece self.circuit_breaker_tripped = False para continuar.")
+                self.is_running = False  # Stop the loop; requires manual intervention
+                break
+
+            self.analyze_spread(spot, perp, funding_rate)
             time.sleep(3) # Pausa de 3 segundos para no saturar la API
 
 if __name__ == "__main__":
