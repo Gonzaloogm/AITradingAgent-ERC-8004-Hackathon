@@ -325,7 +325,7 @@ Respond ONLY with a valid JSON object, no extra text:
             print(f"[WARN] LLM unavailable ({e}). "
                   f"Using default threshold: {self.LLM_DEFAULT_THRESHOLD}%")
             return self.LLM_DEFAULT_THRESHOLD
-
+            
     def get_market_prices(self):
         """Fetch live BTC spot price, perpetual price, and funding rate from Binance."""
         try:
@@ -421,81 +421,33 @@ Respond ONLY with a valid JSON object, no extra text:
     # Directory where artifact JSON files are written (simulates IPFS upload)
     ARTIFACT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts")
 
-    def generate_validation_artifact(
-        self,
-        spot: float,
-        perp: float,
-        funding_rate: float,
-        net_yield: float,
-        llm_threshold: float,
-        trade_intent_data: dict,
-        signature: str,
-    ) -> str:
-        """Build a structured validation artifact for the ERC-8004 Validation
-        Registry and persist it locally (simulating an IPFS upload).
-
-        The artifact captures every input and decision variable that led to the
-        trade so that any third party can independently verify the agent's
-        behavior without trusting the agent itself.
+    def generate_validation_artifact(self, trade_intent_data: dict, signature: str) -> str:
+        """Build an ERC-8004 compliant validation artifact, hash it with keccak,
+        and save it locally to simulate an IPFS/ValidationRegistry upload.
 
         Args:
-            spot:             BTC spot price at execution time.
-            perp:             BTC perpetual price at execution time.
-            funding_rate:     Raw funding rate from Binance premiumIndex.
-            net_yield:        Calculated net yield after spread + funding - fees.
-            llm_threshold:    Spread threshold returned by the LLM this tick.
-            trade_intent_data: The full EIP-712 message_data dict.
-            signature:        Hex-encoded EIP-712 signature.
+            trade_intent_data: The EIP-712 message_data dict from the signed trade.
+            signature:         Hex-encoded EIP-712 signature.
 
         Returns:
-            request_hash: Keccak-256 hex digest of the serialized artifact.
+            request_hash: Full keccak-256 hex digest of the artifact JSON.
         """
         artifact = {
-            # --- Provenance ---
-            "schema_version": "erc8004-validation-v1",
-            "generated_at":   int(time.time()),
-            "agent_address":  self.tee_auth.address,
-            # --- Market inputs ---
-            "market_inputs": {
-                "symbol":       "BTCUSDT",
-                "spot_price":   spot,
-                "perp_price":   perp,
-                "funding_rate": funding_rate,
-                "spread_pct":   round((perp - spot) / spot * 100, 6),
-            },
-            # --- Risk & AI reasoning ---
-            "risk_analysis": {
-                "exchange_fee_pct":  0.10,
-                "net_yield_pct":    round(net_yield, 6),
-                "llm_model":        self.llm_model,
-                "llm_threshold_pct": round(llm_threshold, 6),
-                "decision":         "EXECUTE" if net_yield > 0 and (perp - spot) / spot * 100 >= llm_threshold else "SKIP",
-            },
-            # --- Portfolio state at execution ---
-            "portfolio_state": {
-                "current_equity_eth": round(self.current_equity, 8),
-                "peak_equity_eth":    round(self.peak_equity, 8),
-                "drawdown_pct":       round(
-                    (self.peak_equity - self.current_equity) / self.peak_equity * 100, 4
-                ) if self.peak_equity > 0 else 0.0,
-                "risk_fraction":      self.RISK_FRACTION,
-            },
-            # --- EIP-712 trade intent ---
-            "trade_intent": {
-                **trade_intent_data,
-                "eip712_signature": signature,
+            "timestamp": int(time.time()),
+            "protocol":  "ERC-8004",
+            "registry":  "ValidationRegistry",
+            "execution": {
+                "trade_intent": trade_intent_data,
+                "signature":    signature,
             },
         }
 
-        # Serialize deterministically so the hash is reproducible
-        artifact_bytes = json.dumps(artifact, sort_keys=True).encode("utf-8")
+        artifact_json = json.dumps(artifact, sort_keys=True)
+        request_hash  = Web3.keccak(text=artifact_json).hex()
+        short_hash    = request_hash[:10]
 
-        # Keccak-256 hash (mirrors on-chain hashing)
-        request_hash = Web3.keccak(artifact_bytes).hex()
-
-        # Persist to local artifacts directory (simulates IPFS upload)
-        os.makedirs(self.ARTIFACT_DIR, exist_ok=True)
-        artifact_path = os.path.join(self.ARTIFACT_DIR, f"artifact_{request_hash}.json")
+        os.makedirs("src/agent/artifacts", exist_ok=True)
+        artifact_path = f"src/agent/artifacts/artifact_{short_hash}.json"
         with open(artifact_path, "w", encoding="utf-8") as fh:
             json.dump(artifact, fh, indent=2, sort_keys=True)
 
@@ -557,15 +509,7 @@ Respond ONLY with a valid JSON object, no extra text:
         print(f"[INFO] Signature (hex): {signed_intent.signature.hex()}")
 
         # Generate ERC-8004 validation artifact immediately after signing
-        self.generate_validation_artifact(
-            spot=getattr(self, "_last_spot", self.last_price or 0.0),
-            perp=getattr(self, "_last_perp", self.last_price or 0.0),
-            funding_rate=getattr(self, "_last_funding_rate", 0.0),
-            net_yield=getattr(self, "_last_net_yield_pct", 0.0),
-            llm_threshold=getattr(self, "_last_llm_threshold", 0.0),
-            trade_intent_data=message_data,
-            signature=signed_intent.signature.hex(),
-        )
+        self.generate_validation_artifact(message_data, signed_intent.signature.hex())
 
         # Next step: submit this to the blockchain
         self.submit_to_risk_router(message_data, signed_intent.signature.hex())
@@ -630,9 +574,12 @@ Respond ONLY with a valid JSON object, no extra text:
                 intent_data["timestamp"]
             )
 
+            # Convert hex signature string -> raw bytes (ABI type is `bytes`)
+            signature_bytes = bytes.fromhex(signature.replace("0x", ""))
+
             tx = router_contract.functions.executeTrade(
                 intent_tuple,
-                signature
+                signature_bytes
             ).build_transaction({
                 'from':     wallet_address,
                 'nonce':    nonce,
@@ -679,7 +626,6 @@ Respond ONLY with a valid JSON object, no extra text:
             llm_threshold = await self.analyze_market_context_with_llm(
                 spot, perp, funding_rate, recent_volatility
             )
-
             self.analyze_spread(spot, perp, funding_rate, llm_threshold)
             await asyncio.sleep(3)  # Non-blocking pause
 
