@@ -23,6 +23,7 @@ class DeltaNeutralEngine:
         self.is_running = True
         self.circuit_breaker_tripped = False  # Safety flag -- halts trading on extreme volatility
         self.last_price = None                # Tracks the previous spot price for swing detection
+        self.short_term_memory: list = []     # Rolling 5-entry log of recent tick decisions
 
         # ------------------------------------------------------------------
         # PORTFOLIO HEALTH / DRAWDOWN CONTROL
@@ -280,12 +281,29 @@ Respond ONLY with a valid JSON object, no extra text:
 
         try:
             print("[INFO] Querying LLM for dynamic spread threshold...")
+
+            # Build a concise text representation of recent decisions for the system prompt
+            memory_block = (
+                "\n".join(f"  - {m}" for m in self.short_term_memory)
+                if self.short_term_memory
+                else "  (no prior decisions recorded yet)"
+            )
+            system_prompt = (
+                "You are a precise quantitative risk manager. "
+                "You only respond with valid JSON.\n\n"
+                "Recent agent memory (last 5 ticks):\n"
+                f"{memory_block}\n\n"
+                "Adaptive threshold guidance:\n"
+                "- If recent memory shows mostly SKIP entries with a high threshold, "
+                "consider lowering the threshold slightly if current volatility allows.\n"
+                "- If recent memory shows an EXECUTE entry, raise the threshold to "
+                "avoid over-trading and protect capital."
+            )
+
             response = await self.llm_client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
-                    {"role": "system",
-                     "content": "You are a precise quantitative risk manager. "
-                                "You only respond with valid JSON."},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
@@ -364,6 +382,13 @@ Respond ONLY with a valid JSON object, no extra text:
         if spread_ok and yield_ok:
             print("[OK] Cash-and-Carry opportunity confirmed by LLM. Executing trade.")
 
+            # Cache market metrics for the validation artifact
+            self._last_spot          = spot
+            self._last_perp          = perp
+            self._last_funding_rate  = funding_rate
+            self._last_net_yield_pct = net_yield_pct
+            self._last_llm_threshold = llm_threshold
+
             # --- Dynamic position sizing (fractional risk) ---
             available_eth    = self.get_available_capital()
             trade_size_eth   = available_eth * self.RISK_FRACTION
@@ -378,6 +403,108 @@ Respond ONLY with a valid JSON object, no extra text:
         else:
             print("[INFO] Conditions not met. Waiting for better opportunity...")
 
+        # --- Short-term memory: record this tick's outcome (rolling 5-entry window) ---
+        tick_time = time.strftime("%H:%M:%S", time.localtime())
+        decision  = "EXECUTE" if (spread_ok and yield_ok) else "SKIP"
+        memory_entry = (
+            f"[{tick_time}] {decision}: spread={spread_pct:.4f}%, "
+            f"LLM_threshold={llm_threshold:.4f}%, net_yield={net_yield_pct:.4f}%"
+        )
+        self.short_term_memory.append(memory_entry)
+        if len(self.short_term_memory) > 5:
+            self.short_term_memory.pop(0)  # Evict oldest entry
+        print(f"[MEM] {memory_entry}")
+
+    # ------------------------------------------------------------------
+    # ERC-8004 VALIDATION ARTIFACT
+    # ------------------------------------------------------------------
+    # Directory where artifact JSON files are written (simulates IPFS upload)
+    ARTIFACT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts")
+
+    def generate_validation_artifact(
+        self,
+        spot: float,
+        perp: float,
+        funding_rate: float,
+        net_yield: float,
+        llm_threshold: float,
+        trade_intent_data: dict,
+        signature: str,
+    ) -> str:
+        """Build a structured validation artifact for the ERC-8004 Validation
+        Registry and persist it locally (simulating an IPFS upload).
+
+        The artifact captures every input and decision variable that led to the
+        trade so that any third party can independently verify the agent's
+        behavior without trusting the agent itself.
+
+        Args:
+            spot:             BTC spot price at execution time.
+            perp:             BTC perpetual price at execution time.
+            funding_rate:     Raw funding rate from Binance premiumIndex.
+            net_yield:        Calculated net yield after spread + funding - fees.
+            llm_threshold:    Spread threshold returned by the LLM this tick.
+            trade_intent_data: The full EIP-712 message_data dict.
+            signature:        Hex-encoded EIP-712 signature.
+
+        Returns:
+            request_hash: Keccak-256 hex digest of the serialized artifact.
+        """
+        artifact = {
+            # --- Provenance ---
+            "schema_version": "erc8004-validation-v1",
+            "generated_at":   int(time.time()),
+            "agent_address":  self.tee_auth.address,
+            # --- Market inputs ---
+            "market_inputs": {
+                "symbol":       "BTCUSDT",
+                "spot_price":   spot,
+                "perp_price":   perp,
+                "funding_rate": funding_rate,
+                "spread_pct":   round((perp - spot) / spot * 100, 6),
+            },
+            # --- Risk & AI reasoning ---
+            "risk_analysis": {
+                "exchange_fee_pct":  0.10,
+                "net_yield_pct":    round(net_yield, 6),
+                "llm_model":        self.llm_model,
+                "llm_threshold_pct": round(llm_threshold, 6),
+                "decision":         "EXECUTE" if net_yield > 0 and (perp - spot) / spot * 100 >= llm_threshold else "SKIP",
+            },
+            # --- Portfolio state at execution ---
+            "portfolio_state": {
+                "current_equity_eth": round(self.current_equity, 8),
+                "peak_equity_eth":    round(self.peak_equity, 8),
+                "drawdown_pct":       round(
+                    (self.peak_equity - self.current_equity) / self.peak_equity * 100, 4
+                ) if self.peak_equity > 0 else 0.0,
+                "risk_fraction":      self.RISK_FRACTION,
+            },
+            # --- EIP-712 trade intent ---
+            "trade_intent": {
+                **trade_intent_data,
+                "eip712_signature": signature,
+            },
+        }
+
+        # Serialize deterministically so the hash is reproducible
+        artifact_bytes = json.dumps(artifact, sort_keys=True).encode("utf-8")
+
+        # Keccak-256 hash (mirrors on-chain hashing)
+        request_hash = Web3.keccak(artifact_bytes).hex()
+
+        # Persist to local artifacts directory (simulates IPFS upload)
+        os.makedirs(self.ARTIFACT_DIR, exist_ok=True)
+        artifact_path = os.path.join(self.ARTIFACT_DIR, f"artifact_{request_hash}.json")
+        with open(artifact_path, "w", encoding="utf-8") as fh:
+            json.dump(artifact, fh, indent=2, sort_keys=True)
+
+        print("[OK] Validation Artifact generated and hashed for ERC-8004 Validation Registry.")
+        print(f"[INFO] Request hash  : 0x{request_hash}")
+        print(f"[INFO] Artifact file : {artifact_path}")
+
+        return request_hash
+
     def create_trade_intent(self, action, market, amount):
         print("[INFO] Building TradeIntent (EIP-712)...")
 
@@ -388,23 +515,36 @@ Respond ONLY with a valid JSON object, no extra text:
             "verifyingContract": "0x0000000000000000000000000000000000000000"  # Update with real contract address
         }
 
+        # MAX_SLIPPAGE_BPS: 50 basis points = 0.5% slippage tolerance
+        MAX_SLIPPAGE_BPS = 50
+        # DEADLINE: signature expires in 5 minutes — prevents MEV replay attacks
+        SIGNATURE_TTL    = 300  # seconds
+
         message_types = {
             "TradeIntent": [
-                {"name": "agentId",    "type": "uint256"},
-                {"name": "action",     "type": "string"},
-                {"name": "market",     "type": "string"},
-                {"name": "amount",     "type": "uint256"},
-                {"name": "timestamp",  "type": "uint256"}
+                {"name": "agentId",        "type": "uint256"},
+                {"name": "action",         "type": "string"},
+                {"name": "market",         "type": "string"},
+                {"name": "amount",         "type": "uint256"},
+                {"name": "timestamp",      "type": "uint256"},
+                {"name": "maxSlippageBps", "type": "uint16"},
+                {"name": "deadline",       "type": "uint256"},
             ]
         }
 
+        now = int(time.time())
         message_data = {
-            "agentId":   1,
-            "action":    action,
-            "market":    market,
-            "amount":    amount,
-            "timestamp": int(time.time())
+            "agentId":        1,
+            "action":         action,
+            "market":         market,
+            "amount":         amount,
+            "timestamp":      now,
+            "maxSlippageBps": MAX_SLIPPAGE_BPS,
+            "deadline":       now + SIGNATURE_TTL,
         }
+
+        print(f"[INFO] maxSlippageBps : {MAX_SLIPPAGE_BPS} bps ({MAX_SLIPPAGE_BPS / 100:.2f}% tolerance)")
+        print(f"[INFO] Deadline       : {message_data['deadline']}  (expires in {SIGNATURE_TTL}s)")
 
         signable_message = encode_typed_data(domain_data, message_types, message_data)
 
@@ -415,6 +555,17 @@ Respond ONLY with a valid JSON object, no extra text:
 
         print("[OK] TradeIntent signed successfully.")
         print(f"[INFO] Signature (hex): {signed_intent.signature.hex()}")
+
+        # Generate ERC-8004 validation artifact immediately after signing
+        self.generate_validation_artifact(
+            spot=getattr(self, "_last_spot", self.last_price or 0.0),
+            perp=getattr(self, "_last_perp", self.last_price or 0.0),
+            funding_rate=getattr(self, "_last_funding_rate", 0.0),
+            net_yield=getattr(self, "_last_net_yield_pct", 0.0),
+            llm_threshold=getattr(self, "_last_llm_threshold", 0.0),
+            trade_intent_data=message_data,
+            signature=signed_intent.signature.hex(),
+        )
 
         # Next step: submit this to the blockchain
         self.submit_to_risk_router(message_data, signed_intent.signature.hex())
