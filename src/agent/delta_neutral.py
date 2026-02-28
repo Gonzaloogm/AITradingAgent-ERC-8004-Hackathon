@@ -7,6 +7,7 @@ from eth_account.messages import encode_typed_data
 from web3.auto import w3
 from web3 import Web3
 
+#python3 src/agent/delta_neutral.py
 # Explicitly load .env from the project root (two levels up from src/agent/)
 _project_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 load_dotenv(os.path.join(_project_root, '.env'))
@@ -27,7 +28,7 @@ class DeltaNeutralEngine:
         self.tee_auth = TEEAuthenticator(
             domain="localhost:8000",
             salt=os.getenv("AGENT_SALT", "default_salt"),
-            use_tee=False,
+            use_tee=True,
             private_key=private_key
         )
 

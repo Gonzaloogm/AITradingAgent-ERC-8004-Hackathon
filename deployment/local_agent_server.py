@@ -204,7 +204,7 @@ async def startup_event():
     tee_auth = TEEAuthenticator(
         domain=domain,
         salt=salt,
-        use_tee=False,  # Use private key mode locally
+        use_tee=True,  
         private_key=private_key
     )
 
