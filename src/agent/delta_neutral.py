@@ -10,7 +10,7 @@ from eth_account.messages import encode_typed_data
 from web3.auto import w3
 from web3 import Web3
 
-#python3 src/agent/delta_neutral.py
+# python3 src/agent/delta_neutral.py
 # Explicitly load .env from the project root (two levels up from src/agent/)
 _project_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 load_dotenv(os.path.join(_project_root, '.env'))
@@ -21,22 +21,22 @@ from tee_auth import TEEAuthenticator
 class DeltaNeutralEngine:
     def __init__(self):
         self.is_running = True
-        self.circuit_breaker_tripped = False  # Safety flag — halts trading on extreme volatility
+        self.circuit_breaker_tripped = False  # Safety flag -- halts trading on extreme volatility
         self.last_price = None                # Tracks the previous spot price for swing detection
 
         # ------------------------------------------------------------------
         # PORTFOLIO HEALTH / DRAWDOWN CONTROL
         # ------------------------------------------------------------------
-        self.initial_capital      = 10.0   # ETH — synced with get_available_capital() mock
-        self.current_equity       = self.initial_capital
-        self.peak_equity          = self.initial_capital
-        self.max_allowable_drawdown = 0.05  # 5% maximum drawdown from peak
+        self.initial_capital        = 10.0   # ETH -- synced with get_available_capital() mock
+        self.current_equity         = self.initial_capital
+        self.peak_equity            = self.initial_capital
+        self.max_allowable_drawdown = 0.05   # 5% maximum drawdown from peak
 
-        print("🔑 Inicializando entorno seguro TEE...")
+        print("[INFO] Initializing secure TEE environment...")
         private_key = os.getenv("PRIVATE_KEY")
         if not private_key:
             raise EnvironmentError(
-                "PRIVATE_KEY no está definida en el archivo .env del proyecto."
+                "PRIVATE_KEY is not defined in the project .env file."
             )
         self.tee_auth = TEEAuthenticator(
             domain="localhost:8000",
@@ -46,18 +46,18 @@ class DeltaNeutralEngine:
         )
 
         # ------------------------------------------------------------------
-        # LLM CLIENT  (RedPill-compatible / OpenAI-compatible endpoint)
+        # LLM CLIENT  (free OpenAI-compatible endpoint, e.g. AI/ML API, OpenRouter)
         # ------------------------------------------------------------------
-        api_key = os.getenv("REDPILL_API_KEY") or os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("OPENAI_BASE_URL", "https://api.red-pill.ai/v1")
+        api_key = os.getenv("FREE_LLM_API_KEY")
+        base_url = os.getenv("LLM_BASE_URL", "https://api.aimlapi.com/v1")
         if not api_key:
-            print("⚠️  REDPILL_API_KEY / OPENAI_API_KEY no definida. "
-                  "El LLM usará el umbral por defecto en cada tick.")
+            print("[WARN] FREE_LLM_API_KEY not defined. "
+                  "LLM will use the default threshold each tick.")
         self.llm_client = openai.AsyncOpenAI(
             api_key=api_key or "no-key",
             base_url=base_url,
         )
-        self.llm_model = os.getenv("LLM_MODEL", "gpt-4o")
+        self.llm_model = os.getenv("LLM_MODEL", "meta-llama/llama-3-8b-instruct")
 
     # ------------------------------------------------------------------
     # CIRCUIT BREAKER
@@ -67,20 +67,20 @@ class DeltaNeutralEngine:
     def check_circuit_breaker(self, current_price, last_price):
         """Trip the circuit breaker if BTC spot swings more than 5% in one loop cycle."""
         if last_price is None:
-            return  # No previous reference — skip on the very first tick
+            return  # No previous reference -- skip on the very first tick
 
         swing_pct = abs((current_price - last_price) / last_price) * 100
 
-        print(f"🔍 Comprobación de volatilidad: swing entre ticks = {swing_pct:.4f}%")
+        print(f"[INFO] Volatility check: inter-tick price swing = {swing_pct:.4f}%")
 
         if swing_pct > self.CIRCUIT_BREAKER_THRESHOLD_PCT:
             self.circuit_breaker_tripped = True
             print("=" * 60)
-            print("🚨 CIRCUIT BREAKER TRIPPED: Trading Halted")
-            print(f"   Causa: variación de precio de {swing_pct:.2f}% "
-                  f"(umbral: {self.CIRCUIT_BREAKER_THRESHOLD_PCT}%)")
-            print(f"   Precio anterior: ${last_price:,.2f}  →  Precio actual: ${current_price:,.2f}")
-            print("   Reinicia manualmente self.circuit_breaker_tripped = False para reanudar.")
+            print("[CRITICAL] CIRCUIT BREAKER TRIPPED: Trading Halted")
+            print(f"   Cause  : price swing of {swing_pct:.2f}% "
+                  f"(threshold: {self.CIRCUIT_BREAKER_THRESHOLD_PCT}%)")
+            print(f"   Previous price: ${last_price:,.2f}  ->  Current price: ${current_price:,.2f}")
+            print("   Manually reset self.circuit_breaker_tripped = False to resume.")
             print("=" * 60)
 
     def update_equity_and_drawdown(self, simulated_pnl: float) -> float:
@@ -92,7 +92,7 @@ class DeltaNeutralEngine:
 
         Returns:
             current_drawdown_pct: Drawdown from peak as a positive fraction
-            (e.g. 0.03 = 3%). Trips the circuit breaker if ≥ max_allowable_drawdown.
+            (e.g. 0.03 = 3%). Trips the circuit breaker if >= max_allowable_drawdown.
         """
         # 1. Update equity
         self.current_equity += simulated_pnl
@@ -106,21 +106,21 @@ class DeltaNeutralEngine:
             (self.peak_equity - self.current_equity) / self.peak_equity
         ) if self.peak_equity > 0 else 0.0
 
-        print(f"📉 Portfolio — Equity: {self.current_equity:.6f} ETH "
+        print(f"[INFO] Portfolio -- Equity: {self.current_equity:.6f} ETH "
               f"| Peak: {self.peak_equity:.6f} ETH "
               f"| Drawdown: {current_drawdown_pct * 100:.3f}% "
-              f"(límite: {self.max_allowable_drawdown * 100:.1f}%)")
+              f"(limit: {self.max_allowable_drawdown * 100:.1f}%)")
 
         # 4. Trip circuit breaker permanently if drawdown exceeds limit
         if current_drawdown_pct >= self.max_allowable_drawdown:
             self.circuit_breaker_tripped = True
             print("#" * 60)
-            print("🚨 CRITICAL — DRAWDOWN LIMIT BREACHED: Trading Halted Permanently")
-            print(f"   Drawdown actual:  {current_drawdown_pct * 100:.3f}%")
-            print(f"   Límite máximo:   {self.max_allowable_drawdown * 100:.1f}%")
-            print(f"   Equity actual:    {self.current_equity:.6f} ETH")
-            print(f"   Peak equity:      {self.peak_equity:.6f} ETH")
-            print("   El agente NO operará más hasta reiniciarse manualmente.")
+            print("[CRITICAL] DRAWDOWN LIMIT BREACHED: Trading Halted Permanently")
+            print(f"   Current drawdown : {current_drawdown_pct * 100:.3f}%")
+            print(f"   Maximum allowed  : {self.max_allowable_drawdown * 100:.1f}%")
+            print(f"   Current equity   : {self.current_equity:.6f} ETH")
+            print(f"   Peak equity      : {self.peak_equity:.6f} ETH")
+            print("   Agent will NOT execute further trades until manually restarted.")
             print("#" * 60)
 
         return current_drawdown_pct
@@ -142,7 +142,7 @@ class DeltaNeutralEngine:
             valueDecimals = number of decimal places kept (2 by default)
 
         Example:  realized_pnl_percentage = 5.25
-                  value = 525,  valueDecimals = 2   =>  represents 5.25 %
+                  value = 525,  valueDecimals = 2   =>  represents 5.25%
 
         Args:
             trade_id:                Unique identifier for the closed trade.
@@ -160,11 +160,11 @@ class DeltaNeutralEngine:
 
         payload = {
             # --- ERC-8004 giveFeedback fields ---
-            "agentId":       1,            # matches TradeIntent.agentId
+            "agentId":       1,              # matches TradeIntent.agentId
             "tradeId":       trade_id,
             "value":         abs_value_int,  # uint256 fixed-point integer
-            "valueDecimals": VALUE_DECIMALS, # scale factor
-            "isProfit":      is_profitable,  # sign flag (bool)
+            "valueDecimals": VALUE_DECIMALS,  # scale factor
+            "isProfit":      is_profitable,   # sign flag (bool)
             # --- Metadata tags ---
             "tag1": "tradingYield",
             "tag2": "deltaNeural-cash-carry",
@@ -178,10 +178,10 @@ class DeltaNeutralEngine:
             "timestamp": int(time.time()),
         }
 
-        # --- Pretty-print simulation of the on-chain submission ---
+        # --- Print simulation of the on-chain submission ---
         sep = "-" * 60
         print(sep)
-        print("📜  ERC-8004 REPUTATION FEEDBACK — SIMULATED SUBMISSION")
+        print("[INFO] ERC-8004 REPUTATION FEEDBACK -- SIMULATED SUBMISSION")
         print(sep)
         print(f"  Trade ID        : {payload['tradeId']}")
         print(f"  Agent ID        : {payload['agentId']}")
@@ -197,8 +197,8 @@ class DeltaNeutralEngine:
         print(f"  Drawdown        : {payload['drawdownPct']}%")
         print(f"  Timestamp       : {payload['timestamp']}")
         print(sep)
-        print("  ⛓️  (Simulacion completada. Conecta el Reputation Registry")
-        print("       contract para enviar esto on-chain.)")
+        print("  NOTE: Simulation complete. Connect the Reputation Registry")
+        print("        contract to submit this payload on-chain.")
         print(sep)
 
         return payload
@@ -223,14 +223,14 @@ class DeltaNeutralEngine:
             balance_wei = w3_client.eth.get_balance(wallet_address)
             balance_eth = w3_client.from_wei(balance_wei, "ether")
 
-            print(f"💼 Balance on-chain: {balance_eth:.6f} ETH  "
-                  f"(dirección: {wallet_address})")
+            print(f"[INFO] On-chain balance: {balance_eth:.6f} ETH  "
+                  f"(address: {wallet_address})")
             return float(balance_eth)
 
         except Exception as e:
-            mock_balance = 10.0  # ETH — used for local / offline testing
-            print(f"⚠️  No se pudo consultar el balance on-chain ({e}). "
-                  f"Usando balance simulado: {mock_balance} ETH")
+            mock_balance = 10.0  # ETH -- used for local / offline testing
+            print(f"[WARN] Could not query on-chain balance ({e}). "
+                  f"Using mock balance: {mock_balance} ETH")
             return mock_balance
 
     # ------------------------------------------------------------------
@@ -247,8 +247,7 @@ class DeltaNeutralEngine:
         current market conditions.
 
         Returns:
-            required_spread_threshold (float, range 1.5–5.0 expressed as %,
-            e.g. 0.15 means 0.15%).
+            required_spread_threshold (float, clamped to [0.015, 0.20] percent).
         """
         spread_pct = ((perp_price - spot_price) / spot_price) * 100
         funding_pct = funding_rate * 100
@@ -261,10 +260,10 @@ that justifies opening the position given current slippage and
 volatility risk.
 
 Market metrics:
-- BTC Spot price:       ${spot_price:,.2f}
-- BTC Perp price:       ${perp_price:,.2f}
-- Current spread:       {spread_pct:.4f}%
-- Funding rate (8h):    {funding_pct:.4f}%
+- BTC Spot price:         ${spot_price:,.2f}
+- BTC Perp price:         ${perp_price:,.2f}
+- Current spread:         {spread_pct:.4f}%
+- Funding rate (8h):      {funding_pct:.4f}%
 - Recent tick volatility: {recent_volatility:.4f}% (price swing last tick)
 
 Rules:
@@ -280,7 +279,7 @@ Respond ONLY with a valid JSON object, no extra text:
 """
 
         try:
-            print("🧠 Consultando al LLM para obtener el umbral de spread dinámico...")
+            print("[INFO] Querying LLM for dynamic spread threshold...")
             response = await self.llm_client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
@@ -300,161 +299,154 @@ Respond ONLY with a valid JSON object, no extra text:
             threshold = float(data["required_spread_threshold"])
             # Clamp to allowed range
             threshold = max(0.015, min(threshold, 0.20))
-            print(f"🧠 LLM threshold recibido: {threshold:.4f}% "
-                  f"(spread actual: {spread_pct:.4f}%)")
+            print(f"[INFO] LLM threshold received: {threshold:.4f}% "
+                  f"(current spread: {spread_pct:.4f}%)")
             return threshold
 
         except Exception as e:
-            print(f"⚠️  LLM no disponible ({e}). "
-                  f"Usando umbral por defecto: {self.LLM_DEFAULT_THRESHOLD}%")
+            print(f"[WARN] LLM unavailable ({e}). "
+                  f"Using default threshold: {self.LLM_DEFAULT_THRESHOLD}%")
             return self.LLM_DEFAULT_THRESHOLD
 
     def get_market_prices(self):
-        # Conexión real a la API pública de Binance
+        """Fetch live BTC spot price, perpetual price, and funding rate from Binance."""
         try:
-            # Obtener precio Spot (Al contado)
             spot_url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
             spot_price = float(requests.get(spot_url).json()["price"])
 
-            # Obtener precio Perpetual (Futuros)
             perp_url = "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
             perp_price = float(requests.get(perp_url).json()["price"])
 
-            # Obtener la tasa de financiación actual (Funding Rate) del mercado perpetuo
             funding_url = "https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"
             funding_data = requests.get(funding_url).json()
             last_funding_rate = float(funding_data["lastFundingRate"])
 
             return spot_price, perp_price, last_funding_rate
         except Exception as e:
-            print(f"⚠️ Error de conexión: {e}. Usando datos de respaldo.")
+            print(f"[WARN] Connection error: {e}. Using fallback data.")
             return 50000.00, 50030.00, 0.0001
 
     def analyze_spread(self, spot, perp, funding_rate, llm_threshold: float):
         """Evaluate market conditions and execute a trade if both the
         AI-determined spread threshold AND net yield criteria are met."""
-        # --- Componentes del rendimiento esperado ---
-        EXCHANGE_FEE_PCT = 0.10  # 0.05% por cada leg (entrada + salida) = 0.10% total
+        EXCHANGE_FEE_PCT = 0.10  # 0.05% per leg (entry + exit) = 0.10% total
 
-        # 1. Spread entre perpetuo y spot (prima del mercado)
+        # 1. Spread between perpetual and spot (market premium)
         spread = perp - spot
         spread_pct = (spread / spot) * 100
 
-        # 2. Tasa de financiación expresada en porcentaje
+        # 2. Funding rate expressed as a percentage
         funding_rate_pct = funding_rate * 100
 
-        # 3. Rendimiento neto = spread + funding rate - comisiones estimadas
+        # 3. Net yield = spread + funding rate - estimated fees
         net_yield_pct = spread_pct + funding_rate_pct - EXCHANGE_FEE_PCT
 
         print("-" * 60)
-        print(f"📊 BTC Spot:              ${spot:,.2f}")
-        print(f"📊 BTC Perp:              ${perp:,.2f}")
-        print(f"📈 Spread (prima):        {spread_pct:.4f}%")
-        print(f"💸 Funding Rate:          {funding_rate_pct:.4f}% (por 8h)")
-        print(f"🏦 Comisiones est.:      -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
-        print(f"✨ Rendimiento Neto:      {net_yield_pct:.4f}%")
-        print(f"🧠 LLM Spread Threshold: {llm_threshold:.4f}% (mínimo requerido)")
+        print(f"[INFO] BTC Spot:              ${spot:,.2f}")
+        print(f"[INFO] BTC Perp:              ${perp:,.2f}")
+        print(f"[INFO] Spread (premium):      {spread_pct:.4f}%")
+        print(f"[INFO] Funding Rate:          {funding_rate_pct:.4f}% (per 8h)")
+        print(f"[INFO] Estimated fees:       -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
+        print(f"[INFO] Net Yield:             {net_yield_pct:.4f}%")
+        print(f"[INFO] LLM Spread Threshold: {llm_threshold:.4f}% (minimum required)")
         print("-" * 60)
 
-        # Gate 1: spread must exceed the LLM-determined minimum threshold
+        # Gate 1: spread must meet or exceed the LLM-determined minimum threshold
         spread_ok = spread_pct >= llm_threshold
         # Gate 2: net yield (after funding + fees) must be strictly positive
         yield_ok  = net_yield_pct > 0.00
 
-        print(f"   ✔ Spread ≥ LLM threshold? {'SÍ' if spread_ok else 'NO'} "
+        print(f"   [CHECK] Spread >= LLM threshold? {'YES' if spread_ok else 'NO'} "
               f"({spread_pct:.4f}% vs {llm_threshold:.4f}%)")
-        print(f"   ✔ Net yield > 0?          {'SÍ' if yield_ok  else 'NO'} "
+        print(f"   [CHECK] Net yield > 0?           {'YES' if yield_ok  else 'NO'} "
               f"({net_yield_pct:.4f}%)")
 
         if spread_ok and yield_ok:
-            print("🚀 ¡Oportunidad de Cash-and-Carry confirmada por el LLM!")
+            print("[OK] Cash-and-Carry opportunity confirmed by LLM. Executing trade.")
 
             # --- Dynamic position sizing (fractional risk) ---
             available_eth    = self.get_available_capital()
             trade_size_eth   = available_eth * self.RISK_FRACTION
             trade_amount_wei = int(Web3.to_wei(trade_size_eth, "ether"))
 
-            print(f"📐 Capital disponible: {available_eth:.6f} ETH")
-            print(f"📐 Tamaño de posición ({int(self.RISK_FRACTION*100)}%): "
-                  f"{trade_size_eth:.6f} ETH  →  {trade_amount_wei} Wei (uint256)")
+            print(f"[INFO] Available capital  : {available_eth:.6f} ETH")
+            print(f"[INFO] Position size ({int(self.RISK_FRACTION*100)}%): "
+                  f"{trade_size_eth:.6f} ETH  ->  {trade_amount_wei} Wei (uint256)")
 
             self.create_trade_intent("LONG_SPOT_SHORT_PERP", "BTC/USDC", trade_amount_wei)
             self.is_running = False
         else:
-            print("⏳ Condiciones no satisfechas. Esperando mejor oportunidad...")
+            print("[INFO] Conditions not met. Waiting for better opportunity...")
 
     def create_trade_intent(self, action, market, amount):
-        print(f"📝 Construyendo TradeIntent (EIP-712)...")
-        
+        print("[INFO] Building TradeIntent (EIP-712)...")
+
         domain_data = {
             "name": "HackathonRiskRouter",
             "version": "1",
-            "chainId": 11155111, 
-            "verifyingContract": "0x0000000000000000000000000000000000000000" # Se actualizará con el contrato real del hackathon
+            "chainId": 11155111,
+            "verifyingContract": "0x0000000000000000000000000000000000000000"  # Update with real contract address
         }
 
         message_types = {
             "TradeIntent": [
-                {"name": "agentId", "type": "uint256"},
-                {"name": "action", "type": "string"},
-                {"name": "market", "type": "string"},
-                {"name": "amount", "type": "uint256"},
-                {"name": "timestamp", "type": "uint256"}
+                {"name": "agentId",    "type": "uint256"},
+                {"name": "action",     "type": "string"},
+                {"name": "market",     "type": "string"},
+                {"name": "amount",     "type": "uint256"},
+                {"name": "timestamp",  "type": "uint256"}
             ]
         }
 
         message_data = {
-            "agentId": 1, 
-            "action": action,
-            "market": market,
-            "amount": amount,
+            "agentId":   1,
+            "action":    action,
+            "market":    market,
+            "amount":    amount,
             "timestamp": int(time.time())
         }
 
         signable_message = encode_typed_data(domain_data, message_types, message_data)
-        
+
         signed_intent = w3.eth.account.sign_message(
-            signable_message, 
+            signable_message,
             private_key=self.tee_auth.private_key
         )
 
-        print("✅ ¡TradeIntent firmado!")
-        print(f"✍️ Firma (Hex): {signed_intent.signature.hex()}")
-        
-        # Siguiente paso del hackathon: Enviar esto a la blockchain
+        print("[OK] TradeIntent signed successfully.")
+        print(f"[INFO] Signature (hex): {signed_intent.signature.hex()}")
+
+        # Next step: submit this to the blockchain
         self.submit_to_risk_router(message_data, signed_intent.signature.hex())
 
     def submit_to_risk_router(self, intent_data, signature):
         print("-" * 50)
-        print("🌐 INICIANDO CONEXIÓN ON-CHAIN AL RISK ROUTER...")
+        print("[INFO] INITIATING ON-CHAIN CONNECTION TO RISK ROUTER...")
 
-        # 1. Conectar al nodo RPC (Tu agente usará la red que definiste en el.env)
+        # 1. Connect to RPC node
         rpc_url = os.getenv("RPC_URL", "https://sepolia.base.org")
         w3_client = Web3(Web3.HTTPProvider(rpc_url))
 
         if not w3_client.is_connected():
-            print("❌ Error: No se pudo conectar a la red blockchain.")
+            print("[ERROR] Could not connect to the blockchain network.")
             return
 
-        print(f"✅ Conectado a la red L2. Bloque actual: {w3_client.eth.block_number}")
+        print(f"[OK] Connected to L2 network. Current block: {w3_client.eth.block_number}")
 
-        # -------------------------------------------------------------------
-        # ⚠️ IMPORTANTE PARA EL HACKATHON:
-        # Aquí deberás poner la dirección real que LabLab proporcione para el Risk Router
+        # NOTE: Replace with the real Risk Router address provided by LabLab
         risk_router_address = w3_client.to_checksum_address("0x0000000000000000000000000000000000000000")
-        
-        # Este es un ABI (mapa del contrato) estándar simulado para el hackathon. 
-        # Deberás actualizarlo con el ABI oficial si tiene más parámetros.
+
+        # Standard ABI for the hackathon. Update with the official ABI if it has more parameters.
         risk_router_abi = [
             {
                 "inputs": [
                     {
                         "components": [
-                            {"name": "agentId", "type": "uint256"},
-                            {"name": "action", "type": "string"},
-                            {"name": "market", "type": "string"},
-                            {"name": "amount", "type": "uint256"},
-                            {"name": "timestamp", "type": "uint256"}
+                            {"name": "agentId",    "type": "uint256"},
+                            {"name": "action",     "type": "string"},
+                            {"name": "market",     "type": "string"},
+                            {"name": "amount",     "type": "uint256"},
+                            {"name": "timestamp",  "type": "uint256"}
                         ],
                         "internalType": "struct RiskRouter.TradeIntent",
                         "name": "intent",
@@ -468,19 +460,17 @@ Respond ONLY with a valid JSON object, no extra text:
                 "type": "function"
             }
         ]
-        # -------------------------------------------------------------------
 
         try:
-            # 2. Instanciar el contrato del Risk Router
+            # 2. Instantiate the Risk Router contract
             router_contract = w3_client.eth.contract(address=risk_router_address, abi=risk_router_abi)
 
-            # 3. Preparar los datos de envío (la wallet del TEE es quien paga el gas para enviar la orden)
+            # 3. Prepare transaction data (TEE wallet pays gas)
             wallet_address = w3_client.to_checksum_address(self.tee_auth.address)
             nonce = w3_client.eth.get_transaction_count(wallet_address)
 
-            print("⏳ Construyendo la transacción para la EVM...")
-            
-            # Formatear los datos del intent exactamente como espera el contrato (en forma de tupla)
+            print("[INFO] Building transaction for the EVM...")
+
             intent_tuple = (
                 intent_data["agentId"],
                 intent_data["action"],
@@ -489,34 +479,34 @@ Respond ONLY with a valid JSON object, no extra text:
                 intent_data["timestamp"]
             )
 
-            # Construir la transacción llamando a la función executeTrade del contrato
             tx = router_contract.functions.executeTrade(
                 intent_tuple,
                 signature
             ).build_transaction({
-                'from': wallet_address,
-                'nonce': nonce,
-                'gas': 500000, # Límite de gas estimado
+                'from':     wallet_address,
+                'nonce':    nonce,
+                'gas':      500000,
                 'gasPrice': w3_client.eth.gas_price
             })
 
-            # 4. Firmar la transacción de envío a la red (usando la clave aislada)
+            # 4. Sign the transaction with the isolated TEE key
             signed_tx = w3_client.eth.account.sign_transaction(tx, private_key=self.tee_auth.private_key)
 
-            print("🚀 Transacción construida y firmada. Lista para broadcast.")
-            
-            # 5. Ejecución final (Comentado por seguridad hasta que pongas el contrato real)
+            print("[OK] Transaction built and signed. Ready for broadcast.")
+
+            # 5. Broadcast (commented out until the real contract address is set)
             # tx_hash = w3_client.eth.send_raw_transaction(signed_tx.raw_transaction)
-            # print(f"✅ ¡Transacción enviada al Risk Router! Hash: {w3_client.to_hex(tx_hash)}")
-            
-            print("⚠️ (Modo simulación completado. Añade la dirección del Risk Router para enviar dinero de prueba).")
+            # print(f"[OK] Transaction submitted to Risk Router. Hash: {w3_client.to_hex(tx_hash)}")
+
+            print("[INFO] Simulation complete. Set the real Risk Router address to broadcast.")
             print("-" * 50)
 
         except Exception as e:
-            print(f"❌ Error al enviar la transaccsuión: {e}")
+            print(f"[ERROR] Failed to submit transaction: {e}")
             print("-" * 50)
+
     async def run_loop(self):
-        print("🤖 Iniciando Agente Delta-Neutral AI (Cash-and-Carry) con datos en vivo...")
+        print("[INFO] Starting Delta-Neutral AI Agent (Cash-and-Carry) with live data...")
         while self.is_running:
             spot, perp, funding_rate = self.get_market_prices()
 
@@ -529,8 +519,8 @@ Respond ONLY with a valid JSON object, no extra text:
             self.last_price = spot  # Always update reference price
 
             if self.circuit_breaker_tripped:
-                print("🛑 CIRCUIT BREAKER activo — omitiendo evaluación de trades.")
-                print("   Reinicia el agente o establece self.circuit_breaker_tripped = False para continuar.")
+                print("[CRITICAL] Circuit breaker is active -- skipping trade evaluation.")
+                print("   Restart the agent or set self.circuit_breaker_tripped = False to resume.")
                 self.is_running = False
                 break
 

@@ -14,23 +14,23 @@ Update the dashboard to add reputation display and optimize TEE verification wit
 
 ```
 Step 1: Wallet Funding
-   ↓ (when funded)
+ ↓ (when funded)
 
 Step 2: Identity Registration
-   ↓ (when registered)
-   └──→ Backend: Auto-start TEE preparation (background)
+ ↓ (when registered)
+ └──→ Backend: Auto-start TEE preparation (background)
 
 Step 3: Reputation Display (NEW)
-   - Fetch /api/reputation
-   - Show score or "No reputation yet"
-   - Poll /api/tee/status every 3s (silent)
-   - Auto-complete, enable Step 4
-   ↓
+ - Fetch /api/reputation
+ - Show score or "No reputation yet"
+ - Poll /api/tee/status every 3s (silent)
+ - Auto-complete, enable Step 4
+ ↓
 
 Step 4: TEE Verification (was Step 3)
-   ├─ If prepared: "Submit TEE Verification" → fast tx only
-   └─ If preparing: "Preparing... (45s)" → wait then submit
-   ↓ (when verified)
+ ├─ If prepared: "Submit TEE Verification" → fast tx only
+ └─ If preparing: "Preparing... (45s)" → wait then submit
+ ↓ (when verified)
 
 Step 5: Agent Ready (was Step 4)
 ```
@@ -41,10 +41,10 @@ Step 5: Agent Ready (was Step 4)
 
 ```python
 tee_preparation = {
-    "state": "idle",      # idle | preparing | ready | error
-    "started_at": None,
-    "proof_data": None,   # Cached offchain proof
-    "error": None
+  "state": "idle",      # idle | preparing | ready | error
+  "started_at": None,
+  "proof_data": None,   # Cached offchain proof
+  "error": None
 }
 ```
 
@@ -57,8 +57,8 @@ Start background attestation and offchain proof fetch.
 **Response:**
 ```json
 {
-  "state": "preparing",
-  "message": "TEE preparation started"
+ "state": "preparing",
+ "message": "TEE preparation started"
 }
 ```
 
@@ -76,10 +76,10 @@ Return current preparation state.
 **Response:**
 ```json
 {
-  "state": "ready",
-  "elapsed_seconds": 28,
-  "error": null,
-  "cached_until": "2026-01-27T12:00:00Z"
+ "state": "ready",
+ "elapsed_seconds": 28,
+ "error": null,
+ "cached_until": "2026-01-27T12:00:00Z"
 }
 ```
 
@@ -97,7 +97,7 @@ Auto-trigger TEE preparation after successful registration:
 
 ```python
 if result.success:
-    asyncio.create_task(prepare_tee_attestation())
+  asyncio.create_task(prepare_tee_attestation())
 ```
 
 #### POST /api/tee/register
@@ -122,13 +122,13 @@ if result.success:
 
 ```html
 <div id="step3" class="bg-gray-800 rounded-lg p-6 opacity-50">
-    <div class="flex items-center gap-4 mb-4">
-        <div id="step3-status" class="w-8 h-8 rounded-full bg-gray-600">3</div>
-        <h2 class="text-2xl font-bold">Reputation</h2>
-    </div>
-    <div id="step3-content" class="ml-12">
-        <!-- Dynamic content -->
-    </div>
+  <div class="flex items-center gap-4 mb-4">
+      <div id="step3-status" class="w-8 h-8 rounded-full bg-gray-600">3</div>
+      <h2 class="text-2xl font-bold">Reputation</h2>
+  </div>
+  <div id="step3-content" class="ml-12">
+      <!-- Dynamic content -->
+  </div>
 </div>
 ```
 
@@ -137,8 +137,8 @@ if result.success:
 | State | Display |
 |-------|---------|
 | Loading | Spinner + "Fetching reputation..." |
-| No reputation | "✓ No feedback yet" + "Build reputation by completing tasks" |
-| Has reputation | "✓ Reputation Active" + score + feedback count |
+| No reputation | " No feedback yet" + "Build reputation by completing tasks" |
+| Has reputation | " Reputation Active" + score + feedback count |
 
 ### Step 4 - TEE with Preparation Status
 
@@ -154,22 +154,22 @@ if result.success:
 ```javascript
 // Poll TEE preparation status
 async function pollTEEStatus() {
-    const result = await apiClient.get('/api/tee/status');
-    if (result.success) {
-        updateTEEUI(result.data);
-    }
+  const result = await apiClient.get('/api/tee/status');
+  if (result.success) {
+      updateTEEUI(result.data);
+  }
 }
 
 // Check reputation
 async function checkReputation() {
-    const result = await apiClient.get('/api/reputation');
-    // Display reputation, auto-proceed to Step 4
+  const result = await apiClient.get('/api/reputation');
+  // Display reputation, auto-proceed to Step 4
 }
 
 // Retry TEE preparation
 async function retryTEEPreparation() {
-    await apiClient.post('/api/tee/prepare');
-    pollTEEStatus();
+  await apiClient.post('/api/tee/prepare');
+  pollTEEStatus();
 }
 ```
 
@@ -177,16 +177,16 @@ async function retryTEEPreparation() {
 
 ```javascript
 async getTEEStatus() {
-    return this.get('/api/tee/status');
+  return this.get('/api/tee/status');
 }
 
 async prepareTEE() {
-    return this.post('/api/tee/prepare');
+  return this.post('/api/tee/prepare');
 }
 
 async getReputation(agentId = null) {
-    const endpoint = agentId ? `/api/reputation/${agentId}` : '/api/reputation';
-    return this.get(endpoint);
+  const endpoint = agentId ? `/api/reputation/${agentId}` : '/api/reputation';
+  return this.get(endpoint);
 }
 ```
 

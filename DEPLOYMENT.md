@@ -7,79 +7,79 @@ Complete guide for deploying your ERC-8004 TEE Agent to Phala Network CVM.
 ### 1. Code Preparation
 
 - [ ] **Test thoroughly in VibeVM**
-  - Agent starts successfully
-  - All endpoints respond correctly
-  - Registration flow works end-to-end
-  - TEE simulation functions properly
+ - Agent starts successfully
+ - All endpoints respond correctly
+ - Registration flow works end-to-end
+ - TEE simulation functions properly
 
 - [ ] **Update `agent_config.json`**
-  - [ ] Production agent name and description
-  - [ ] Correct image URL (if applicable)
-  - [ ] Enabled endpoints are configured
-  - [ ] Production chain IDs are listed
-  - [ ] Trust models are accurate
+ - [ ] Production agent name and description
+ - [ ] Correct image URL (if applicable)
+ - [ ] Enabled endpoints are configured
+ - [ ] Production chain IDs are listed
+ - [ ] Trust models are accurate
 
 - [ ] **Verify `entrypoint.sh`**
-  - [ ] All required system dependencies listed
-  - [ ] Python package installation included
-  - [ ] Custom setup steps added (models, databases, etc.)
-  - [ ] Server start command is correct
+ - [ ] All required system dependencies listed
+ - [ ] Python package installation included
+ - [ ] Custom setup steps added (models, databases, etc.)
+ - [ ] Server start command is correct
 
 - [ ] **Review source code**
-  - [ ] No hardcoded secrets or API keys
-  - [ ] Production-ready error handling
-  - [ ] Logging configured appropriately
-  - [ ] No development/debug code remaining
+ - [ ] No hardcoded secrets or API keys
+ - [ ] Production-ready error handling
+ - [ ] Logging configured appropriately
+ - [ ] No development/debug code remaining
 
 ### 2. Repository Setup
 
 - [ ] **Commit production code**
-  ```bash
-  git add .
-  git commit -m "Production ready: [describe changes]"
-  git push origin main
-  ```
+ ```bash
+ git add .
+ git commit -m "Production ready: [describe changes]"
+ git push origin main
+ ```
 
 - [ ] **Record commit hash**
-  ```bash
-  git rev-parse HEAD
-  # Save this hash - you'll need it for deployment
-  ```
+ ```bash
+ git rev-parse HEAD
+ # Save this hash - you'll need it for deployment
+ ```
 
 - [ ] **Ensure repository is public** (or add SSH key to Phala)
 
 - [ ] **Tag release** (optional but recommended)
-  ```bash
-  git tag -a v1.0.0 -m "Production release v1.0.0"
-  git push origin v1.0.0
-  ```
+ ```bash
+ git tag -a v1.0.0 -m "Production release v1.0.0"
+ git push origin v1.0.0
+ ```
 
 ### 3. Environment Configuration
 
 - [ ] **Prepare secrets** (do NOT commit these)
-  - [ ] `GITHUB_REPO`: Your repository URL
-  - [ ] `GIT_COMMIT_HASH`: Production commit hash from step 2
-  - [ ] `AGENT_SALT`: Unique, secure random string (save this securely!)
+ - [ ] `GITHUB_REPO`: Your repository URL
+ - [ ] `GIT_COMMIT_HASH`: Production commit hash from step 2
+ - [ ] `AGENT_SALT`: Unique, secure random string (save this securely!)
 
 - [ ] **Generate AGENT_SALT**
-  ```bash
-  # Generate a secure random salt
-  openssl rand -hex 32
-  # Save this securely - you'll need it to recover your agent wallet
-  ```
+ ```bash
+ # Generate a secure random salt
+ openssl rand -hex 32
+ # Save this securely - you'll need it to recover your agent wallet
+ ```
 
 - [ ] **Verify contract addresses** in `.env.example`
-  - ETH Sepolia (testnet):
-    - `IDENTITY_REGISTRY_ADDRESS`: 0x8004A818BFB912233c491871b3d84c89A494BD9e
-    - `REPUTATION_REGISTRY_ADDRESS`: 0x8004B663056A597Dffe9eCcC1965A193B7388713
-    - `TEE_REGISTRY_ADDRESS`: 0x034675a9541445087Cd73B2120d6c8AF7F2056E3
-    - `TEE_VERIFIER_ADDRESS`: 0x27F8C122618b05420c2f67A9464415586C30D18B
+ - ETH Sepolia (testnet):
+  - `IDENTITY_REGISTRY_ADDRESS`: 0x8004A818BFB912233c491871b3d84c89A494BD9e
+  - `REPUTATION_REGISTRY_ADDRESS`: 0x8004B663056A597Dffe9eCcC1965A193B7388713
+  - `TEE_REGISTRY_ADDRESS`: 0x034675a9541445087Cd73B2120d6c8AF7F2056E3
+  - `TEE_VERIFIER_ADDRESS`: 0x27F8C122618b05420c2f67A9464415586C30D18B
 
 ### 4. Funding Preparation
 
 - [ ] **Acquire ETH Sepolia ETH**
-  - Use [Sepolia Faucet](https://sepoliafaucet.com) or [Alchemy Faucet](https://sepoliafaucet.com)
-  - Minimum: 0.001 ETH (recommended: 0.01 ETH for multiple operations)
+ - Use [Sepolia Faucet](https://sepoliafaucet.com) or [Alchemy Faucet](https://sepoliafaucet.com)
+ - Minimum: 0.001 ETH (recommended: 0.01 ETH for multiple operations)
 
 - [ ] **Have wallet ready** to send ETH to agent's derived address
 
@@ -110,8 +110,8 @@ Complete guide for deploying your ERC-8004 TEE Agent to Phala Network CVM.
 ### Step 3: Upload Configuration
 
 - [ ] **Upload `docker-compose.yml`** from this repository
-  - The file is already configured for production
-  - No modifications should be needed
+ - The file is already configured for production
+ - No modifications should be needed
 
 ### Step 4: Set Environment Variables
 
@@ -150,25 +150,25 @@ Configure these in Phala's secret management:
 **Expected log sequence:**
 
 ```
-🔄 Cloning repository from https://github.com/...
-✅ Checked out commit a1b2c3d4...
-✅ Repository initialized successfully
-🚀 Starting agent from entrypoint.sh...
-🔧 Installing dependencies...
-📦 Installing Python packages...
-🚀 Starting ERC-8004 TEE Agent...
+ Cloning repository from https://github.com/...
+ Checked out commit a1b2c3d4...
+ Repository initialized successfully
+ Starting agent from entrypoint.sh...
+ Installing dependencies...
+ Installing Python packages...
+ Starting ERC-8004 TEE Agent...
 ```
 
 ### Step 6: Note Agent URL
 
 - [ ] **Save your agent URL** provided by Phala
-  - Format: `https://{DSTACK_APP_ID}-8000.{DSTACK_GATEWAY_DOMAIN}`
-  - Example: `https://abc123-8000.phala.network`
+ - Format: `https://{DSTACK_APP_ID}-8000.{DSTACK_GATEWAY_DOMAIN}`
+ - Example: `https://abc123-8000.phala.network`
 
 - [ ] **Test agent is accessible**
-  ```bash
-  curl https://your-agent-url.phala.network/api/status
-  ```
+ ```bash
+ curl https://your-agent-url.phala.network/api/status
+ ```
 
 ---
 
@@ -179,86 +179,86 @@ Configure these in Phala's secret management:
 - [ ] Navigate to your agent URL in browser
 - [ ] Note the displayed wallet address (derived from `AGENT_SALT`)
 - [ ] Or fetch via API:
-  ```bash
-  curl https://your-agent-url.phala.network/api/wallet
-  ```
+ ```bash
+ curl https://your-agent-url.phala.network/api/wallet
+ ```
 
 ### Step 2: Fund Agent Wallet
 
 - [ ] Send ETH Sepolia ETH to the agent's wallet address
-  - Minimum: 0.001 ETH
-  - Recommended: 0.01 ETH
+ - Minimum: 0.001 ETH
+ - Recommended: 0.01 ETH
 
 - [ ] Verify transaction confirmed on [Sepolia Explorer](https://sepolia.etherscan.io)
 
 - [ ] Check balance:
-  ```bash
-  curl https://your-agent-url.phala.network/api/wallet
-  ```
+ ```bash
+ curl https://your-agent-url.phala.network/api/wallet
+ ```
 
 ### Step 3: Register Agent On-Chain
 
 - [ ] Navigate to `/dashboard` on your agent URL
-  - Or use API: `POST https://your-agent-url.phala.network/api/register`
+ - Or use API: `POST https://your-agent-url.phala.network/api/register`
 
 - [ ] Click "Register Agent" button
 
 - [ ] Wait for transaction confirmation
 
 - [ ] Verify registration:
-  ```bash
-  curl https://your-agent-url.phala.network/api/status
-  # Should show: "registered": true
-  ```
+ ```bash
+ curl https://your-agent-url.phala.network/api/status
+ # Should show: "registered": true
+ ```
 
 ### Step 4: Submit TEE Attestation
 
 - [ ] Navigate to TEE registration interface
-  - Or use API: `POST https://your-agent-url.phala.network/api/tee/register`
+ - Or use API: `POST https://your-agent-url.phala.network/api/tee/register`
 
 - [ ] Click "Register TEE" or trigger automatic submission
 
 - [ ] Wait for attestation verification
 
 - [ ] Verify TEE status:
-  ```bash
-  curl https://your-agent-url.phala.network/api/status
-  # Should show: "teeVerified": true
-  ```
+ ```bash
+ curl https://your-agent-url.phala.network/api/status
+ # Should show: "teeVerified": true
+ ```
 
 ### Step 5: Validate Deployment
 
 Run complete validation:
 
 - [ ] **Agent card is accessible**
-  ```bash
-  curl https://your-agent-url.phala.network/agent.json
-  ```
-  - Should return valid ERC-8004 JSON
+ ```bash
+ curl https://your-agent-url.phala.network/agent.json
+ ```
+ - Should return valid ERC-8004 JSON
 
 - [ ] **A2A endpoints work**
-  ```bash
-  curl https://your-agent-url.phala.network/.well-known/agent-card.json
-  ```
+ ```bash
+ curl https://your-agent-url.phala.network/.well-known/agent-card.json
+ ```
 
 - [ ] **Status shows all systems operational**
-  ```bash
-  curl https://your-agent-url.phala.network/api/status
-  ```
-  - `registered: true`
-  - `teeVerified: true`
-  - `balance: > 0`
+ ```bash
+ curl https://your-agent-url.phala.network/api/status
+ ```
+ - `registered: true`
+ - `teeVerified: true`
+ - `balance: > 0`
 
 - [ ] **Test task submission** (if applicable)
-  ```bash
-  curl -X POST https://your-agent-url.phala.network/tasks \
-    -H "Content-Type: application/json" \
-    -d '{
-      "type": "task-request",
-      "from": "did:example:test",
-      "task": {"type": "test"}
-    }'
-  ```
+ ```bash
+ curl -X POST https://your-agent-url.phala.network/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "task-request",
+    "from": "did:example:test",
+    "task": {"type": "test"}
+  }'
+ ```
 
 ---
 
@@ -294,8 +294,8 @@ If you encounter issues:
 3. **Review configuration** - Double-check all secrets and variables
 4. **Search issues** - Check repository issues for similar problems
 5. **Ask for help**:
-   - [GitHub Issues](https://github.com/YOUR_USERNAME/erc-8004-tee-agent/issues)
-   - [Phala Discord](https://discord.gg/phala)
+ - [GitHub Issues](https://github.com/YOUR_USERNAME/erc-8004-tee-agent/issues)
+ - [Phala Discord](https://discord.gg/phala)
 
 ---
 
@@ -355,15 +355,15 @@ When you need to deploy updates:
 
 Your deployment is successful when:
 
-✅ Agent URL is accessible
-✅ `/agent.json` returns valid ERC-8004 data
-✅ Agent is registered on-chain (`registered: true`)
-✅ TEE is verified (`teeVerified: true`)
-✅ Wallet has sufficient balance
-✅ All configured endpoints are functional
-✅ A2A protocol accepts task submissions
-✅ TEE attestation is cryptographically valid
-✅ Agent responds to requests within expected timeframes
+ Agent URL is accessible
+ `/agent.json` returns valid ERC-8004 data
+ Agent is registered on-chain (`registered: true`)
+ TEE is verified (`teeVerified: true`)
+ Wallet has sufficient balance
+ All configured endpoints are functional
+ A2A protocol accepts task submissions
+ TEE attestation is cryptographically valid
+ Agent responds to requests within expected timeframes
 
 ---
 
@@ -380,6 +380,6 @@ After successful deployment:
 
 ---
 
-**Congratulations!** 🎉 Your ERC-8004 TEE Agent is now live in production!
+**Congratulations!**  Your ERC-8004 TEE Agent is now live in production!
 
 For ongoing support, see [DEV_GUIDE.md](DEV_GUIDE.md) or reach out via [GitHub Issues](https://github.com/YOUR_USERNAME/erc-8004-tee-agent/issues).

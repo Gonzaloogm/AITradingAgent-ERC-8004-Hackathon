@@ -26,7 +26,7 @@ The agent supports **verifiable AI-assisted code generation** with a beautiful w
 2. Scroll to the purple "Generate & Execute Code" panel
 3. Select language (Python/JavaScript)
 4. Describe what you want: "Calculate the factorial of 10"
-5. Click "🤖 Generate & Execute"
+5. Click " Generate & Execute"
 6. View formatted result with generated code, output, and TEE attestation
 7. Click "Copy" to copy code or "Download Attestation" for verification
 
@@ -52,30 +52,30 @@ AI_MAX_TOKENS=2000
 import httpx
 
 task = {
-    "data": {
-        "type": "ai_generate_and_execute",
-        "description": "Calculate the factorial of 10 and print the result",
-        "language": "python",
-        "include_attestation": True
-    }
+  "data": {
+      "type": "ai_generate_and_execute",
+      "description": "Calculate the factorial of 10 and print the result",
+      "language": "python",
+      "include_attestation": True
+  }
 }
 
 async with httpx.AsyncClient() as client:
-    resp = await client.post(
-        "http://localhost:8000/api/process",
-        json=task
-    )
-    result = resp.json()
+  resp = await client.post(
+      "http://localhost:8000/api/process",
+      json=task
+  )
+  result = resp.json()
 
-    print("Generated Code:")
-    print(result["generated_code"])
+  print("Generated Code:")
+  print(result["generated_code"])
 
-    print("\nExecution Output:")
-    print(result["execution_result"]["stdout"])
+  print("\nExecution Output:")
+  print(result["execution_result"]["stdout"])
 
-    # Save attestation for verification
-    with open("attestation.json", "w") as f:
-        json.dump(result, f, indent=2)
+  # Save attestation for verification
+  with open("attestation.json", "w") as f:
+      json.dump(result, f, indent=2)
 ```
 
 ### 3. Verify Attestation
@@ -91,14 +91,14 @@ python verify_ai_attestation.py attestation.json
 
 ```json
 {
-  "data": {
-    "type": "ai_generate_and_execute",
-    "description": "<natural language task description>",
-    "language": "python" | "javascript",
-    "context": { /* optional context */ },
-    "max_retries": 2,
-    "include_attestation": true
-  }
+ "data": {
+  "type": "ai_generate_and_execute",
+  "description": "<natural language task description>",
+  "language": "python" | "javascript",
+  "context": { /* optional context */ },
+  "max_retries": 2,
+  "include_attestation": true
+ }
 }
 ```
 
@@ -116,39 +116,39 @@ python verify_ai_attestation.py attestation.json
 
 ```json
 {
+ "success": true,
+ "language": "python",
+ "generated_code": "# AI-generated code here",
+ "execution_result": {
   "success": true,
-  "language": "python",
-  "generated_code": "# AI-generated code here",
-  "execution_result": {
-    "success": true,
-    "stdout": "output...",
-    "stderr": "",
-    "result": null
+  "stdout": "output...",
+  "stderr": "",
+  "result": null
+ },
+ "attestation": {
+  "type": "nvidia_h100_tee",
+  "measurements": { /* ... */ },
+  "signature": { /* ... */ },
+  "timestamp": "2025-01-15T10:30:00Z",
+  "nonce": "...",
+  "inference": {
+    "model": "phala/qwen-2.5-7b-instruct",
+    "prompt_hash": "...",
+    "response_hash": "...",
+    "usage": { /* token usage */ }
   },
-  "attestation": {
-    "type": "nvidia_h100_tee",
-    "measurements": { /* ... */ },
-    "signature": { /* ... */ },
-    "timestamp": "2025-01-15T10:30:00Z",
+  "verification": {
     "nonce": "...",
-    "inference": {
-      "model": "phala/qwen-2.5-7b-instruct",
-      "prompt_hash": "...",
-      "response_hash": "...",
-      "usage": { /* token usage */ }
-    },
-    "verification": {
-      "nonce": "...",
-      "fetched_at": "...",
-      "inference_timestamp": 1736938200
-    }
-  },
-  "retries_used": 0,
-  "verification_instructions": {
-    "message": "This result includes TEE attestation...",
-    "verification_script": "python verify_ai_attestation.py",
-    "docs_url": "https://docs.redpill.ai/confidential-ai/attestation"
+    "fetched_at": "...",
+    "inference_timestamp": 1736938200
   }
+ },
+ "retries_used": 0,
+ "verification_instructions": {
+  "message": "This result includes TEE attestation...",
+  "verification_script": "python verify_ai_attestation.py",
+  "docs_url": "https://docs.redpill.ai/confidential-ai/attestation"
+ }
 }
 ```
 
@@ -159,11 +159,11 @@ python verify_ai_attestation.py attestation.json
 **Request:**
 ```json
 {
-  "data": {
-    "type": "ai_generate_and_execute",
-    "description": "Load data from /tmp/sales.csv, calculate total revenue, and create a bar chart of top 5 products by sales",
-    "language": "python"
-  }
+ "data": {
+  "type": "ai_generate_and_execute",
+  "description": "Load data from /tmp/sales.csv, calculate total revenue, and create a bar chart of top 5 products by sales",
+  "language": "python"
+ }
 }
 ```
 
@@ -196,15 +196,15 @@ print('Chart saved to /tmp/top_products.png')
 **Request:**
 ```json
 {
-  "data": {
-    "type": "ai_generate_and_execute",
-    "description": "Check the ETH balance of address 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb on Base network",
-    "language": "javascript",
-    "context": {
-      "network": "Base",
-      "rpc": "https://base.llamarpc.com"
-    }
+ "data": {
+  "type": "ai_generate_and_execute",
+  "description": "Check the ETH balance of address 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb on Base network",
+  "language": "javascript",
+  "context": {
+    "network": "Base",
+    "rpc": "https://base.llamarpc.com"
   }
+ }
 }
 ```
 
@@ -237,10 +237,10 @@ data = open('/tmp/missing.txt').read()
 ```python
 # Adds error handling
 try:
-    data = open('/tmp/missing.txt').read()
+  data = open('/tmp/missing.txt').read()
 except FileNotFoundError:
-    print("File not found, using default data")
-    data = "default content"
+  print("File not found, using default data")
+  data = "default content"
 print(f"Data: {data}")
 ```
 
@@ -263,11 +263,11 @@ python verify_ai_attestation.py attestation.json
 ```
 
 This checks:
-- ✓ Attestation structure is valid
-- ✓ Nonce is present (replay protection)
-- ✓ Timestamp is recent (<10 minutes)
-- ✓ TEE type is valid (NVIDIA H100)
-- ✓ Inference metadata is complete
+-  Attestation structure is valid
+-  Nonce is present (replay protection)
+-  Timestamp is recent (<10 minutes)
+-  TEE type is valid (NVIDIA H100)
+-  Inference metadata is complete
 
 **2. Full Verification (Advanced)**
 
@@ -280,16 +280,16 @@ verifier = AIAttestationVerifier()
 
 # Load attestation
 with open('attestation.json') as f:
-    att = json.load(f)
+  att = json.load(f)
 
 # Full verification
 success = verifier.verify_attestation(att)
 
 if success:
-    # Also verify code hash
-    code = att["generated_code"]
-    expected_hash = att["attestation"]["inference"]["response_hash"]
-    verifier.verify_code_hash(code, expected_hash)
+  # Also verify code hash
+  code = att["generated_code"]
+  expected_hash = att["attestation"]["inference"]["response_hash"]
+  verifier.verify_code_hash(code, expected_hash)
 ```
 
 **3. Independent Verification (Trustless)**
@@ -303,9 +303,9 @@ import hashlib
 # 1. Get fresh attestation from RedPill
 nonce = secrets.token_hex(32)
 attestation = requests.get(
-    "https://api.redpill.ai/v1/attestation/report",
-    params={"model": "phala/qwen-2.5-7b-instruct", "nonce": nonce},
-    headers={"Authorization": f"Bearer {api_key}"}
+  "https://api.redpill.ai/v1/attestation/report",
+  params={"model": "phala/qwen-2.5-7b-instruct", "nonce": nonce},
+  headers={"Authorization": f"Bearer {api_key}"}
 ).json()
 
 # 2. Verify code hash matches attestation
@@ -321,15 +321,15 @@ assert attestation["verification"]["nonce"] == nonce
 ### Trust Assumptions
 
 **What you DON'T need to trust:**
-- ✗ The agent operator
-- ✗ The server infrastructure
-- ✗ RedPill's API gateway (for model execution)
+-  The agent operator
+-  The server infrastructure
+-  RedPill's API gateway (for model execution)
 
 **What you DO need to trust:**
-- ✓ Intel (for TDX attestation)
-- ✓ NVIDIA (for H100 TEE attestation)
-- ✓ RedPill's published model hashes
-- ✓ The TEE hardware itself
+-  Intel (for TDX attestation)
+-  NVIDIA (for H100 TEE attestation)
+-  RedPill's published model hashes
+-  The TEE hardware itself
 
 ### Attack Resistance
 
@@ -361,16 +361,16 @@ assert attestation["verification"]["nonce"] == nonce
 **Good Prompts:**
 ```json
 {
-  "description": "Load CSV from /tmp/data.csv, calculate average of 'price' column, create bar chart, save to /tmp/chart.png",
-  "language": "python"
+ "description": "Load CSV from /tmp/data.csv, calculate average of 'price' column, create bar chart, save to /tmp/chart.png",
+ "language": "python"
 }
 ```
 
 **Bad Prompts:**
 ```json
 {
-  "description": "do something with data",  // Too vague
-  "language": "python"
+ "description": "do something with data",  // Too vague
+ "language": "python"
 }
 ```
 
@@ -380,14 +380,14 @@ Provide context for better code generation:
 
 ```json
 {
-  "description": "Calculate compound interest",
-  "language": "python",
-  "context": {
-    "principal": 1000,
-    "rate": 0.05,
-    "years": 10,
-    "formula": "A = P(1 + r)^t"
-  }
+ "description": "Calculate compound interest",
+ "language": "python",
+ "context": {
+  "principal": 1000,
+  "rate": 0.05,
+  "years": 10,
+  "formula": "A = P(1 + r)^t"
+ }
 }
 ```
 
@@ -397,8 +397,8 @@ Let the agent retry automatically:
 
 ```json
 {
-  "description": "Read file and process data",
-  "max_retries": 2  // Allow 2 retries for resilience
+ "description": "Read file and process data",
+ "max_retries": 2  // Allow 2 retries for resilience
 }
 ```
 
@@ -409,13 +409,13 @@ Always verify attestations for production use:
 ```python
 # After generating code
 if result.get("attestation"):
-    with open("attestation.json", "w") as f:
-        json.dump(result, f)
+  with open("attestation.json", "w") as f:
+      json.dump(result, f)
 
-    # Verify before using result
-    verified = verify_attestation("attestation.json")
-    if not verified:
-        raise SecurityError("Attestation verification failed")
+  # Verify before using result
+  verified = verify_attestation("attestation.json")
+  if not verified:
+      raise SecurityError("Attestation verification failed")
 ```
 
 ### 5. Model Selection
@@ -500,8 +500,8 @@ log_metric("ai_generation.retries", result["retries_used"])
 log_metric("ai_generation.language", result["language"])
 
 if result.get("attestation"):
-    log_metric("ai_generation.model", result["attestation"]["inference"]["model"])
-    log_metric("ai_generation.tokens", result["attestation"]["inference"]["usage"])
+  log_metric("ai_generation.model", result["attestation"]["inference"]["model"])
+  log_metric("ai_generation.tokens", result["attestation"]["inference"]["usage"])
 ```
 
 ## Costs
@@ -536,11 +536,11 @@ A: Default: 10 minutes. Configurable in verification script.
 
 ## Next Steps
 
-1. ✓ Set `REDPILL_API_KEY` in `.env`
-2. ✓ Run test script: `python test_ai_generation.py`
-3. ✓ Verify attestations: `python verify_ai_attestation.py attestation_test1.json`
-4. ✓ Integrate into your application
-5. ✓ Monitor metrics and costs
+1.  Set `REDPILL_API_KEY` in `.env`
+2.  Run test script: `python test_ai_generation.py`
+3.  Verify attestations: `python verify_ai_attestation.py attestation_test1.json`
+4.  Integrate into your application
+5.  Monitor metrics and costs
 
 ## Support
 

@@ -133,26 +133,26 @@ This file defines your agent's metadata and capabilities:
 
 ```json
 {
-  "name": "Your Agent Name",
-  "description": "What your agent does",
-  "image": "https://your-domain.com/agent-image.png",
-  "supportedTrust": ["tee-attestation"],
-  "endpoints": {
-    "a2a": {
-      "enabled": true,
-      "version": "0.3.0"
-    },
-    "mcp": {
-      "enabled": false,
-      "endpoint": "",
-      "capabilities": {},
-      "version": "2025-06-18"
-    }
+ "name": "Your Agent Name",
+ "description": "What your agent does",
+ "image": "https://your-domain.com/agent-image.png",
+ "supportedTrust": ["tee-attestation"],
+ "endpoints": {
+  "a2a": {
+    "enabled": true,
+    "version": "0.3.0"
   },
-  "evmChains": [
-    {"name": "Ethereum", "chainId": 1},
-    {"name": "Ethereum-Sepolia", "chainId": 11155111}
-  ]
+  "mcp": {
+    "enabled": false,
+    "endpoint": "",
+    "capabilities": {},
+    "version": "2025-06-18"
+  }
+ },
+ "evmChains": [
+  {"name": "Ethereum", "chainId": 1},
+  {"name": "Ethereum-Sepolia", "chainId": 11155111}
+ ]
 }
 ```
 
@@ -162,13 +162,13 @@ This file defines your agent's metadata and capabilities:
 
 ```json
 "mcp": {
-  "enabled": true,
-  "endpoint": "https://your-agent.com/mcp",
-  "capabilities": {
-    "tools": true,
-    "resources": true
-  },
-  "version": "2025-06-18"
+ "enabled": true,
+ "endpoint": "https://your-agent.com/mcp",
+ "capabilities": {
+  "tools": true,
+  "resources": true
+ },
+ "version": "2025-06-18"
 }
 ```
 
@@ -176,9 +176,9 @@ This file defines your agent's metadata and capabilities:
 
 ```json
 "evmChains": [
-  {"name": "Ethereum", "chainId": 1},
-  {"name": "Polygon", "chainId": 137},
-  {"name": "Arbitrum", "chainId": 42161}
+ {"name": "Ethereum", "chainId": 1},
+ {"name": "Polygon", "chainId": 137},
+ {"name": "Arbitrum", "chainId": 42161}
 ]
 ```
 
@@ -201,8 +201,8 @@ Add custom endpoints in `deployment/local_agent_server.py`:
 ```python
 @app.post("/api/custom-endpoint")
 async def custom_endpoint(request: Request):
-    """Your custom logic here"""
-    return {"status": "success", "data": "..."}
+  """Your custom logic here"""
+  return {"status": "success", "data": "..."}
 ```
 
 ---
@@ -226,16 +226,16 @@ curl http://localhost:8000/.well-known/agent-card.json
 ```bash
 # Submit a task
 curl -X POST http://localhost:8000/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "task-request",
-    "from": "did:example:123",
-    "to": "did:example:agent",
-    "task": {
-      "type": "example-task",
-      "parameters": {}
-    }
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+  "type": "task-request",
+  "from": "did:example:123",
+  "to": "did:example:agent",
+  "task": {
+    "type": "example-task",
+    "parameters": {}
+  }
+ }'
 
 # Check task status
 curl http://localhost:8000/tasks/{task_id}
@@ -269,11 +269,11 @@ Before deploying to Phala CVM, ensure your agent is production-ready.
 
 Test all functionality thoroughly in VibeVM:
 
-- ✅ Wallet generation works
-- ✅ On-chain registration succeeds
-- ✅ All API endpoints respond correctly
-- ✅ Agent card (`/agent.json`) is properly formatted
-- ✅ A2A protocol endpoints are functional
+-  Wallet generation works
+-  On-chain registration succeeds
+-  All API endpoints respond correctly
+-  Agent card (`/agent.json`) is properly formatted
+-  A2A protocol endpoints are functional
 
 ### 2. Review `entrypoint.sh`
 
@@ -283,14 +283,14 @@ Ensure `entrypoint.sh` has the correct build and deploy steps:
 #!/bin/bash
 set -e
 
-echo "🔧 Installing dependencies..."
+echo " Installing dependencies..."
 apt-get update
 apt-get install -y python3 python3-pip
 
-echo "📦 Installing Python packages..."
+echo " Installing Python packages..."
 pip3 install -e .
 
-echo "🚀 Starting ERC-8004 TEE Agent..."
+echo " Starting ERC-8004 TEE Agent..."
 exec python3 deployment/local_agent_server.py
 ```
 
@@ -322,10 +322,10 @@ Ensure production URLs and metadata are set:
 
 ```json
 {
-  "name": "Production Agent Name",
-  "description": "Production description",
-  "image": "https://your-cdn.com/agent-image.png",
-  ...
+ "name": "Production Agent Name",
+ "description": "Production description",
+ "image": "https://your-cdn.com/agent-image.png",
+ ...
 }
 ```
 
@@ -393,11 +393,11 @@ Select your TEE configuration on Phala:
 
 Click "Deploy" on Phala. The CVM will:
 
-1. ✅ Pull Ubuntu image
-2. ✅ Clone your repository
-3. ✅ Check out the commit hash
-4. ✅ Install dependencies
-5. ✅ Start the agent
+1.  Pull Ubuntu image
+2.  Clone your repository
+3.  Check out the commit hash
+4.  Install dependencies
+5.  Start the agent
 
 Monitor the logs to ensure successful startup.
 
@@ -439,10 +439,10 @@ Expected response:
 
 ```json
 {
-  "registered": true,
-  "teeVerified": true,
-  "wallet": "0x...",
-  "domain": "your-agent-url.phala.network"
+ "registered": true,
+ "teeVerified": true,
+ "wallet": "0x...",
+ "domain": "your-agent-url.phala.network"
 }
 ```
 
@@ -467,20 +467,20 @@ If your agent requires additional setup (e.g., downloading ML models, setting up
 #!/bin/bash
 set -e
 
-echo "🔧 Installing dependencies..."
+echo " Installing dependencies..."
 apt-get update
 apt-get install -y python3 python3-pip wget
 
-echo "📦 Installing Python packages..."
+echo " Installing Python packages..."
 pip3 install -e .
 
-echo "🤖 Downloading ML model..."
+echo " Downloading ML model..."
 wget https://example.com/model.bin -O /app/model.bin
 
-echo "💾 Initializing database..."
+echo " Initializing database..."
 python3 scripts/init_db.py
 
-echo "🚀 Starting ERC-8004 TEE Agent..."
+echo " Starting ERC-8004 TEE Agent..."
 exec python3 deployment/local_agent_server.py
 ```
 
@@ -494,11 +494,11 @@ import os
 ENV_MODE = os.getenv("ENV_MODE", "production")
 
 if ENV_MODE == "development":
-    # Use mock TEE for local testing
-    from src.agent.mock_tee import MockTEE as TEE
+  # Use mock TEE for local testing
+  from src.agent.mock_tee import MockTEE as TEE
 else:
-    # Use real TEE in production
-    from src.agent.tee_auth import TEEAuth as TEE
+  # Use real TEE in production
+  from src.agent.tee_auth import TEEAuth as TEE
 ```
 
 ---
@@ -529,13 +529,13 @@ Access CVM logs on Phala dashboard to debug issues:
 
 ```bash
 # Example log output
-🔄 Cloning repository from https://github.com/...
-✅ Checked out commit a1b2c3d4...
-✅ Repository initialized successfully
-🚀 Starting agent from entrypoint.sh...
-🔧 Installing dependencies...
-📦 Installing Python packages...
-🚀 Starting ERC-8004 TEE Agent...
+ Cloning repository from https://github.com/...
+ Checked out commit a1b2c3d4...
+ Repository initialized successfully
+ Starting agent from entrypoint.sh...
+ Installing dependencies...
+ Installing Python packages...
+ Starting ERC-8004 TEE Agent...
 ```
 
 ---
@@ -558,4 +558,4 @@ Access CVM logs on Phala dashboard to debug issues:
 
 ---
 
-Happy building! 🚀
+Happy building! 

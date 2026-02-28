@@ -23,17 +23,17 @@ Funding → "Register Agent" Button → [Progress Cards] → "Go to Dashboard" B
 
 ```
 1. Identity Registration (blocking)
-   POST /api/register
-   └─ Returns: { tx_hash, agent_id } (after polling confirmation)
+ POST /api/register
+ └─ Returns: { tx_hash, agent_id } (after polling confirmation)
 
 2. Once Identity confirms, start in parallel:
-   ├─ Reputation (initial feedback submission)
-   │   POST /api/reputation/submit-initial
-   │   └─ Calls giveFeedback(agent_id, 0, 2, "init", "", "", "", 0x00...)
-   │
-   └─ TEE Verification
-       POST /api/tee/prepare
-       └─ then POST /api/tee/register
+ ├─ Reputation (initial feedback submission)
+ │   POST /api/reputation/submit-initial
+ │   └─ Calls giveFeedback(agent_id, 0, 2, "init", "", "", "", 0x00...)
+ │
+ └─ TEE Verification
+    POST /api/tee/prepare
+    └─ then POST /api/tee/register
 ```
 
 ## UI Component: Status Cards
@@ -69,8 +69,8 @@ Three cards replace Steps 2-4:
 |-------|------|-------|-------------|
 | `waiting` | ○ | Gray | Waiting for dependency |
 | `in_progress` | ◐ (spinner) | Blue | Transaction in progress |
-| `success` | ✓ | Green | Completed successfully |
-| `error` | ✕ | Red | Failed (with retry option) |
+| `success` |  | Green | Completed successfully |
+| `error` |  | Red | Failed (with retry option) |
 
 ### Status Messages
 
@@ -114,7 +114,7 @@ Each card can fail and retry independently:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ✕ Reputation                                [error]       │
+│   Reputation                                [error]       │
 │    Transaction failed: insufficient gas                    │
 │    [ Retry ]                                               │
 └─────────────────────────────────────────────────────────────┘
@@ -141,14 +141,14 @@ Response: { tx_hash: string, confirmed: bool }
 
 # Calls:
 giveFeedback(
-    agentId=agent_id,
-    value=0,           # Neutral value
-    valueDecimals=2,
-    tag1="init",       # Marks as initialization entry
-    tag2="",
-    endpoint="",
-    feedbackURI="",
-    feedbackHash=bytes32(0)
+  agentId=agent_id,
+  value=0,           # Neutral value
+  valueDecimals=2,
+  tag1="init",       # Marks as initialization entry
+  tag2="",
+  endpoint="",
+  feedbackURI="",
+  feedbackHash=bytes32(0)
 )
 ```
 
