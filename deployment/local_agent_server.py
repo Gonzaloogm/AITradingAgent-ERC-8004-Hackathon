@@ -281,9 +281,13 @@ async def get_agent_state():
         raise HTTPException(status_code=503, detail="Trading engine not initialized")
 
     return {
-        "circuit_breaker_tripped": trading_engine.circuit_breaker_tripped,
+        "status": "running" if trading_engine.is_running else "halted",
+        "current_llm_threshold": trading_engine.last_llm_threshold or 0.075,
+        "last_spread": getattr(trading_engine, "_last_spread_pct", -0.05),
+        "circuit_breaker_active": trading_engine.circuit_breaker_tripped,
+        
+        # Kept for additional transparency
         "last_spot_price": trading_engine.last_price,
-        "last_llm_threshold": trading_engine.last_llm_threshold,
         "short_term_memory": trading_engine.short_term_memory,
         "timestamp": datetime.utcnow().isoformat()
     }

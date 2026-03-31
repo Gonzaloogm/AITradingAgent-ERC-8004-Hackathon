@@ -62,6 +62,12 @@ class DeltaNeutralEngine:
             base_url=base_url,
         )
         self.llm_model = os.getenv("LLM_MODEL", "meta-llama/llama-3-8b-instruct")
+        
+        # ------------------------------------------------------------------
+        # TRADING SYMBOLS (Dynamic for swarm deployment)
+        # ------------------------------------------------------------------
+        self.symbol_api    = os.getenv("TRADING_SYMBOL_API", "BTCUSDT")    # e.g., ETHUSDT
+        self.symbol_market = os.getenv("TRADING_SYMBOL_MARKET", "BTC/USDC") # e.g., ETH/USDC
 
     # ------------------------------------------------------------------
     # CIRCUIT BREAKER
@@ -172,7 +178,7 @@ class DeltaNeutralEngine:
             # --- Metadata tags ---
             "tag1": "tradingYield",
             "tag2": "deltaNeural-cash-carry",
-            "tag3": "BTC-USDC",
+            "tag3": f"{self.symbol_market.replace('/', '-')}",
             # --- Portfolio audit fields ---
             "currentEquity": round(self.current_equity, 8),
             "peakEquity":    round(self.peak_equity, 8),
@@ -257,15 +263,15 @@ class DeltaNeutralEngine:
         funding_pct = funding_rate * 100
 
         prompt = f"""\
-You are a quantitative risk manager evaluating a BTC delta-neutral
+You are a quantitative risk manager evaluating a {self.symbol_market.split('/')[0]} delta-neutral
 cash-and-carry trade opportunity. Analyze the following real-time
 market metrics and determine the minimum required spread threshold
 that justifies opening the position given current slippage and
 volatility risk.
 
 Market metrics:
-- BTC Spot price:         ${spot_price:,.2f}
-- BTC Perp price:         ${perp_price:,.2f}
+- {self.symbol_market.split('/')[0]} Spot price:         ${spot_price:,.2f}
+- {self.symbol_market.split('/')[0]} Perp price:         ${perp_price:,.2f}
 - Current spread:         {spread_pct:.4f}%
 - Funding rate (8h):      {funding_pct:.4f}%
 - Recent tick volatility: {recent_volatility:.4f}% (price swing last tick)
@@ -336,7 +342,7 @@ Respond ONLY with a valid JSON object, no extra text:
         # 1. Attempt Kraken CLI (Hackathon Track)
         try:
             # Kraken CLI is optimized for AI agents; using -o json guarantees machine-readable NDJSON
-            cmd = "kraken ticker --symbol BTC/USD -o json 2>/dev/null"
+            cmd = f"kraken ticker {self.symbol_market} -o json 2>/dev/null"
             print(f"[INFO] Fetching market data via Kraken CLI ({cmd})...")
             
             result = subprocess.run(
@@ -373,13 +379,13 @@ Respond ONLY with a valid JSON object, no extra text:
 
         # 2. Fallback to Binance API
         try:
-            spot_url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+            spot_url = f"https://api.binance.com/api/v3/ticker/price?symbol={self.symbol_api}"
             spot_price = float(requests.get(spot_url).json()["price"])
 
-            perp_url = "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
+            perp_url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={self.symbol_api}"
             perp_price = float(requests.get(perp_url).json()["price"])
 
-            funding_url = "https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"
+            funding_url = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={self.symbol_api}"
             funding_data = requests.get(funding_url).json()
             last_funding_rate = float(funding_data["lastFundingRate"])
 
@@ -404,8 +410,8 @@ Respond ONLY with a valid JSON object, no extra text:
         net_yield_pct = spread_pct + funding_rate_pct - EXCHANGE_FEE_PCT
 
         print("-" * 60)
-        print(f"[INFO] BTC Spot:              ${spot:,.2f}")
-        print(f"[INFO] BTC Perp:              ${perp:,.2f}")
+        print(f"[INFO] {self.symbol_market.split('/')[0]} Spot:              ${spot:,.2f}")
+        print(f"[INFO] {self.symbol_market.split('/')[0]} Perp:              ${perp:,.2f}")
         print(f"[INFO] Spread (premium):      {spread_pct:.4f}%")
         print(f"[INFO] Funding Rate:          {funding_rate_pct:.4f}% (per 8h)")
         print(f"[INFO] Estimated fees:       -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
@@ -432,6 +438,7 @@ Respond ONLY with a valid JSON object, no extra text:
             self._last_funding_rate  = funding_rate
             self._last_net_yield_pct = net_yield_pct
             self._last_llm_threshold = llm_threshold
+            self._last_spread_pct    = spread_pct
 
             # --- Dynamic position sizing (fractional risk) ---
             available_eth    = self.get_available_capital()
@@ -442,7 +449,7 @@ Respond ONLY with a valid JSON object, no extra text:
             print(f"[INFO] Position size ({int(self.RISK_FRACTION*100)}%): "
                   f"{trade_size_eth:.6f} ETH  ->  {trade_amount_wei} Wei (uint256)")
 
-            self.create_trade_intent("LONG_SPOT_SHORT_PERP", "BTC/USDC", trade_amount_wei)
+            self.create_trade_intent("LONG_SPOT_SHORT_PERP", self.symbol_market, trade_amount_wei)
             self.is_running = False
         else:
             print("[INFO] Conditions not met. Waiting for better opportunity...")
