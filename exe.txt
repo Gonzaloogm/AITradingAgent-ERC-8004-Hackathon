@@ -1,0 +1,4 @@
+source venv/bin/activate
+python3 src/agent/delta_neutral.py
+python3 deployment/local_agent_server.py
+npx phala deploy -n delta-neutral-agent -c docker-compose.yml -e.env

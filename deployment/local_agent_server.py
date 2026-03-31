@@ -38,6 +38,7 @@ from src.agent.tee_auth import TEEAuthenticator
 from src.agent.chain_config import get_chain_config_from_env, log_chain_config
 from src.agent.session_store import SessionStore
 from src.agent.chat_agent import ChatAgent, INITIAL_GREETING
+from src.agent.delta_neutral import DeltaNeutralEngine
 
 
 # Request/Response Models
@@ -71,6 +72,7 @@ app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # Global agent instance
 agent: Optional[ServerAgent] = None
+trading_engine: Optional[DeltaNeutralEngine] = None
 tee_auth: Optional[TEEAuthenticator] = None
 
 # Chat interface components
@@ -232,7 +234,7 @@ async def startup_event():
       role=AgentRole.SERVER,
       chain_id=chain_config.chain_id,
       rpc_url=chain_config.rpc_url,
-      use_tee_auth=False,  # No TEE socket locally; using private key mode
+      use_tee_auth=True,  # No TEE socket locally; using private key mode
       private_key=tee_auth.private_key
   )
 
@@ -263,10 +265,28 @@ async def startup_event():
   print(f"\nAgent Name: {agent_card['name']}")
   print(f"Agent Address: {address}")
   print(f"Domain: {domain}")
-  print(f"\nCapabilities:")
-  for cap in agent_card.get('capabilities', []):
-      print(f"  • {cap['name']}: {cap['description'][:60]}...")
   print("\n" + "=" * 80)
+
+  # Initialize and start the Delta Neutral trading engine in the background
+  global trading_engine
+  print("\n [INFO] Starting Delta Neutral Trading Engine (async background task)...")
+  trading_engine = DeltaNeutralEngine()
+  asyncio.create_task(trading_engine.run_loop())
+
+
+@app.get("/api/agent-state")
+async def get_agent_state():
+    """Get the real-time internal state of the Delta Neutral trading engine."""
+    if not trading_engine:
+        raise HTTPException(status_code=503, detail="Trading engine not initialized")
+
+    return {
+        "circuit_breaker_tripped": trading_engine.circuit_breaker_tripped,
+        "last_spot_price": trading_engine.last_price,
+        "last_llm_threshold": trading_engine.last_llm_threshold,
+        "short_term_memory": trading_engine.short_term_memory,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 
 @app.get("/")

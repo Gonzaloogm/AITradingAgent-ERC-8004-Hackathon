@@ -1,6 +1,7 @@
-import asyncio
 import json
+import subprocess
 import time
+
 import os
 import sys
 import requests
@@ -23,6 +24,7 @@ class DeltaNeutralEngine:
         self.is_running = True
         self.circuit_breaker_tripped = False  # Safety flag -- halts trading on extreme volatility
         self.last_price = None                # Tracks the previous spot price for swing detection
+        self.last_llm_threshold: Optional[float] = None # Tracks the most recent AI risk limit
         self.short_term_memory: list = []     # Rolling 5-entry log of recent tick decisions
 
         # ------------------------------------------------------------------
@@ -317,6 +319,7 @@ Respond ONLY with a valid JSON object, no extra text:
             threshold = float(data["required_spread_threshold"])
             # Clamp to allowed range
             threshold = max(0.015, min(threshold, 0.20))
+            self.last_llm_threshold = threshold # Store for API access
             print(f"[INFO] LLM threshold received: {threshold:.4f}% "
                   f"(current spread: {spread_pct:.4f}%)")
             return threshold
@@ -324,10 +327,50 @@ Respond ONLY with a valid JSON object, no extra text:
         except Exception as e:
             print(f"[WARN] LLM unavailable ({e}). "
                   f"Using default threshold: {self.LLM_DEFAULT_THRESHOLD}%")
+            self.last_llm_threshold = self.LLM_DEFAULT_THRESHOLD
             return self.LLM_DEFAULT_THRESHOLD
             
     def get_market_prices(self):
-        """Fetch live BTC spot price, perpetual price, and funding rate from Binance."""
+        """Fetch market data using Kraken CLI with Binance API as fallback."""
+        # 1. Attempt Kraken CLI (Hackathon Track)
+        try:
+            # Kraken CLI is optimized for AI agents; using -o json guarantees machine-readable NDJSON
+            cmd = "kraken ticker --symbol BTC/USD -o json 2>/dev/null"
+            print(f"[INFO] Fetching market data via Kraken CLI ({cmd})...")
+            
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            # Verify the command succeeded (exit code 0)
+            if result.returncode == 0:
+                try:
+                    # Parse stdout; handles NDJSON or standard JSON objects
+                    data = json.loads(result.stdout.strip())
+                    
+                    # Extract requested fields: spot_price and perp_price
+                    spot_price   = float(data.get("spot_price", data.get("spot", data.get("price"))))
+                    perp_price   = float(data.get("perp_price", data.get("perp", data.get("perp_price"))))
+                    funding_rate = float(data.get("funding_rate", 0.0))
+
+                    print(f"[OK] Market data successfully parsed from Kraken CLI.")
+                    return spot_price, perp_price, funding_rate
+                except json.JSONDecodeError as jde:
+                    print(f"[ERROR] Failed to parse Kraken CLI JSON: {jde}")
+                    print(f"[DEBUG] Raw output: {result.stdout}")
+            else:
+                print(f"[WARN] Kraken CLI returned non-zero exit code: {result.returncode}")
+
+        except Exception as e:
+            # Fallback gracefully if kraken is not installed or other system error occurs
+            reason = type(e).__name__
+            print(f"[WARN] Kraken CLI attempt failed ({reason}). Falling back to Binance API...")
+
+        # 2. Fallback to Binance API
         try:
             spot_url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
             spot_price = float(requests.get(spot_url).json()["price"])
@@ -341,7 +384,7 @@ Respond ONLY with a valid JSON object, no extra text:
 
             return spot_price, perp_price, last_funding_rate
         except Exception as e:
-            print(f"[WARN] Connection error: {e}. Using fallback data.")
+            print(f"[WARN] Binance API connection error: {e}. Using hardcoded fallback data.")
             return 50000.00, 50030.00, 0.0001
 
     def analyze_spread(self, spot, perp, funding_rate, llm_threshold: float):
@@ -603,6 +646,23 @@ Respond ONLY with a valid JSON object, no extra text:
             print(f"[ERROR] Failed to submit transaction: {e}")
             print("-" * 50)
 
+    async def buy_external_signals_x402(self, target_agent_id: int) -> float:
+        """Simulate an Agent-to-Agent (A2A) economic interaction via the x402 protocol.
+        
+        Our agent pays another agent 0.05 USDC on Base to receive premium sentiment
+        data, which is then used to refine the risk threshold.
+        """
+        print(f"[INFO] Initiating x402 micropayment of 0.05 USDC to Agent ID {target_agent_id} "
+              "for premium market sentiment data...")
+        
+        # Simulate network delay for on-chain/p2p micro-settlement
+        await asyncio.sleep(2.0)
+        
+        # Mock sentiment multiplier: 1.05 (slightly higher threshold = more cautious)
+        sentiment_multiplier = 1.05
+        print(f"[OK] x402 payment confirmed. Received sentiment multiplier: {sentiment_multiplier}")
+        return sentiment_multiplier
+
     async def run_loop(self):
         print("[INFO] Starting Delta-Neutral AI Agent (Cash-and-Carry) with live data...")
         while self.is_running:
@@ -622,10 +682,15 @@ Respond ONLY with a valid JSON object, no extra text:
                 self.is_running = False
                 break
 
-            # --- AI: determine dynamic spread threshold for this tick ---
             llm_threshold = await self.analyze_market_context_with_llm(
                 spot, perp, funding_rate, recent_volatility
             )
+            
+            # --- x402 A2A Interaction: Buy external sentiment signals ---
+            # We pay a peer agent for premium data to refine our final threshold
+            sentiment_multiplier = await self.buy_external_signals_x402(target_agent_id=42)
+            llm_threshold *= sentiment_multiplier
+            
             self.analyze_spread(spot, perp, funding_rate, llm_threshold)
             await asyncio.sleep(3)  # Non-blocking pause
 
