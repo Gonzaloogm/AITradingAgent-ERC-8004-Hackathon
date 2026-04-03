@@ -1,36 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import GlassCard from '../components/ui/GlassCard';
 
-// --- Log Templates (from dashboard-live.js) ---
-const logTemplates = [
-  { sys: '[PRISM-API]', type: 'prism', msgs: [
-    'Resolved intent asset "WBTC" to canonical → [BITCOIN:0x...]',
-    'Fetching L2 liquidity depth for cbBTC/USD',
-    'Symbol collision avoided (97% Confidence).',
-  ]},
-  { sys: '[KRAKEN-MCP]', type: 'kraken', msgs: [
-    'Evaluating Delta-neutral spread (Spot vs Perp)',
-    'Circuit Breaker Check: Volatility 1.2% (SAFE)',
-    'Submitting trade intent... Execution 32ms.',
-    'Error HTTP 429: Rate Limit. Utilizing MCP Error Envelope fallback.',
-  ]},
-  { sys: '[TDX-ENV]', type: 'tee', msgs: [
-    'Generating Intel TDX Quote for state validation...',
-    'Attestation signed with derived EIP-1271 key.',
-    'SHA-256 Hash matches RedPill inference manifest.',
-  ]},
-  { sys: '[X402-NET]', type: 'x402', msgs: [
-    'Intercepted 402 PAYMENT-REQUIRED from external Oracle.',
-    'Cost evaluating... 0.05 USDC is within threshold.',
-    'Signing payload and dispensing micropayment via Base L2.',
-    'Access Granted. Data synchronized.',
-  ]},
-  { sys: '[ERC-8004]', type: 'tee', msgs: [
-    'Pushing Reputation Feedback to Identity Registry.',
-    'Validation artifact uploaded to Sandbox.',
-    'Smart Contract Event emitted: TradeVerified()',
-  ]},
-];
+import { apiClient } from '../api/client';
 
 const TYPE_COLOR = {
   prism:  'text-purple-400',
@@ -38,13 +9,6 @@ const TYPE_COLOR = {
   tee:    'text-emerald-400',
   x402:   'text-yellow-400',
 };
-
-function randomLog() {
-  const t = logTemplates[Math.floor(Math.random() * logTemplates.length)];
-  const msg = t.msgs[Math.floor(Math.random() * t.msgs.length)];
-  const time = new Date().toISOString().split('T')[1].slice(0, -1);
-  return { sys: t.sys, type: t.type, msg, time, id: Math.random() };
-}
 
 function KPICard({ label, value, sub, subColor = 'text-gray-500', glowColor }) {
   return (
@@ -58,33 +22,39 @@ function KPICard({ label, value, sub, subColor = 'text-gray-500', glowColor }) {
 
 export default function ResultsPage() {
   const [logs, setLogs] = useState([]);
-  const [pnl, setPnl]   = useState(1452.80);
-  const [x402, setX402] = useState(284);
+  const [agentState, setAgentState] = useState(null);
   const [latency, setLatency] = useState(24);
-  const [sharpe]        = useState(3.24);
-  const [drawdown]      = useState(1.8);
   const logsEndRef = useRef(null);
 
   useEffect(() => {
-    // Init with 6 logs
-    setLogs(Array.from({ length: 6 }, randomLog));
-
-    const logInterval = setInterval(() => {
-      setLogs(prev => {
-        const next = [...prev, randomLog()];
-        return next.length > 14 ? next.slice(next.length - 14) : next;
-      });
-    }, 1200);
-
-    const metricsInterval = setInterval(() => {
-      setLatency(Math.floor(Math.random() * 15 + 15));
-      if (Math.random() > 0.5) {
-        setPnl(prev => prev + (Math.random() * 2 - 0.5));
-        if (Math.random() > 0.8) setX402(prev => +(prev + 0.05).toFixed(2));
+    const fetchState = async () => {
+      const res = await apiClient.getAgentState();
+      if (res.success) {
+        setAgentState(res.data);
+        
+        // Map backend's short term memory buffer into log entries
+        const memLogs = (res.data.short_term_memory || []).map((m, i) => {
+          // memory format usually "[HH:MM:SS] EXECUTE: spread=0.10%, LLM=0.08%"
+          const timestampSplit = m.split(']');
+          const time = timestampSplit[0] ? timestampSplit[0].replace('[', '') : new Date().toISOString().split('T')[1].slice(0, -1);
+          const msg = timestampSplit[1] ? timestampSplit[1].trim() : m;
+          
+          return {
+            id: `${res.data.timestamp}-${i}`,
+            time,
+            sys: '[LLM-EXEC]',
+            type: msg.startsWith('EXECUTE') ? 'tee' : 'kraken',
+            msg
+          };
+        });
+        setLogs(memLogs);
       }
-    }, 3000);
+      setLatency(Math.floor(Math.random() * 15 + 15)); // Simulating API latency visually
+    };
 
-    return () => { clearInterval(logInterval); clearInterval(metricsInterval); };
+    fetchState();
+    const metricsInterval = setInterval(fetchState, 3000);
+    return () => clearInterval(metricsInterval);
   }, []);
 
   useEffect(() => {
@@ -152,28 +122,28 @@ export default function ResultsPage() {
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-3">
             <KPICard
-              label="Kraken PnL (Net)"
-              value={`+$${pnl.toFixed(2)}`}
-              sub="▲ 12.4% 24h"
+              label="Realized PnL (Net)"
+              value={`${(agentState?.current_equity || 0) > (agentState?.initial_capital || 0) ? '+' : ''}${((agentState?.current_equity || 0) - (agentState?.initial_capital || 0)).toFixed(4)} ETH`}
+              sub="Live Agent PnL"
               subColor="text-emerald-400"
               glowColor="cyan-text"
             />
             <KPICard
-              label="Max Drawdown"
-              value={`${drawdown}%`}
-              sub="Safe zone (Limit 5%)"
+              label="Drawdown Limit"
+              value={`${((agentState?.max_allowable_drawdown || 0) * 100).toFixed(1)}%`}
+              sub="Max threshold (SAFE)"
               subColor="text-emerald-400"
             />
             <KPICard
-              label="Risk-Adj Return"
-              value={sharpe.toString()}
-              sub="Sharpe · Excellent"
+              label="Last Threshold"
+              value={`${(agentState?.current_llm_threshold || 0).toFixed(3)}%`}
+              sub="LLM Dynamic Risk"
               glowColor="purple-text"
             />
             <KPICard
-              label="X402 Revenue"
-              value={`${x402.toFixed(2)}`}
-              sub="USDC via Oracle calls"
+              label="Last Spot"
+              value={`$${(agentState?.last_spot_price || 0).toFixed(2)}`}
+              sub="Kraken Base Asset"
               subColor="text-gray-500"
             />
           </div>

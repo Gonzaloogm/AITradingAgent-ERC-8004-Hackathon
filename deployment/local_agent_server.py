@@ -285,6 +285,10 @@ async def get_agent_state():
         "current_llm_threshold": trading_engine.last_llm_threshold or 0.075,
         "last_spread": getattr(trading_engine, "_last_spread_pct", -0.05),
         "circuit_breaker_active": trading_engine.circuit_breaker_tripped,
+        "current_equity": trading_engine.current_equity,
+        "initial_capital": trading_engine.initial_capital,
+        "peak_equity": trading_engine.peak_equity,
+        "max_allowable_drawdown": trading_engine.max_allowable_drawdown,
         
         # Kept for additional transparency
         "last_spot_price": trading_engine.last_price,

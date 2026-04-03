@@ -36,6 +36,7 @@ export class APIClient {
   submitInitialReputation()      { return this.post('/api/reputation/submit-initial'); }
   getReputation(agentId = null)  { return this.get(agentId ? `/api/reputation/${agentId}` : '/api/reputation'); }
   getAgentCard()                 { return this.get('/agent.json'); }
+  getAgentState()                { return this.get('/api/agent-state'); }
 
   async sendChatMessage(sessionId, message) {
     return this.post('/api/chat', { session_id: sessionId, message });
