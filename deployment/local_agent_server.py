@@ -234,7 +234,7 @@ async def startup_event():
       role=AgentRole.SERVER,
       chain_id=chain_config.chain_id,
       rpc_url=chain_config.rpc_url,
-      use_tee_auth=True,  # No TEE socket locally; using private key mode
+      use_tee_auth=False,  # No TEE socket locally; using private key mode
       private_key=tee_auth.private_key
   )
 

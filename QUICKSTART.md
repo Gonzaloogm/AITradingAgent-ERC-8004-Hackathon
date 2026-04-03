@@ -280,3 +280,70 @@ Your Browser
 ---
 
 **Congratulations!** You've deployed a TEE-secured AI agent with on-chain identity.
+
+---
+
+## React Frontend (Local Development)
+
+The project includes a modern React + TailwindCSS frontend in the `frontend/` directory that replaces the static HTML pages with a responsive, glassmorphic UI.
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- The Python backend running on `localhost:8000`
+
+### Step 1: Install Dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### Step 2: Start the Dev Server
+
+```bash
+npm run dev
+```
+
+The app opens at **http://localhost:5173**. All `/api/*` requests are automatically proxied to `http://localhost:8000`.
+
+### Step 3: Build for Production
+
+```bash
+npm run build
+```
+
+Output is in `frontend/dist/`. Deploy this folder to any static host (Vercel, Netlify, Nginx, etc.).
+
+### Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Dashboard — 3-step agent setup (fund → register → ready) |
+| `/funding` | Wallet Funding — QR code, MetaMask send, balance polling |
+| `/developer` | Developer API — Chat interface with the TEE agent |
+| `/results` | Live Ops — Animated trading terminal and KPI metrics |
+
+### Environment / Proxy
+
+In development, Vite proxies all API calls to `localhost:8000`. To change the backend URL, edit `vite.config.js`:
+
+```js
+proxy: {
+  '/api': {
+    target: 'http://your-backend-host:8000',
+    changeOrigin: true,
+  }
+}
+```
+
+### Run Both Together (dev)
+
+```bash
+# Terminal 1 — Python backend
+python deployment/local_agent_server.py --port 8000 --host localhost
+
+# Terminal 2 — React frontend
+cd frontend && npm run dev
+```
+
