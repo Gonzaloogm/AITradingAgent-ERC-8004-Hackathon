@@ -30,7 +30,6 @@ export default function DashboardPage() {
   // Real-time Agent Status Hook
   const { status, loading: statusLoading, error: statusError } = useAgentStatus(10000);
 
-  // New Terminal Dashboard State
   const [agentState, setAgentState] = useState({
      status: 'OFFLINE', 
      circuit_breaker_active: false, 
@@ -38,9 +37,14 @@ export default function DashboardPage() {
      peak_equity: 0, 
      current_llm_threshold: 0.1, 
      last_spot_price: 0, 
+     last_perp_price: 0,
      last_spread: 0,
+     net_delta: 0,
+     logs: [],
+     is_signing: false,
      scan_results: []
   });
+  const [isExecuting, setIsExecuting] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState([
     "[SYSTEM] Delta-Neutral Agent Enclave V2.0 initialized.",
     "[TEE] Intel TDX quote verified by Phala Remote Attestation Daemon.",
@@ -56,15 +60,24 @@ export default function DashboardPage() {
     }
   }, [terminalLogs]);
 
+  // Flash effect on execution
+  useEffect(() => {
+    if (agentState.is_signing) {
+      setIsExecuting(true);
+      const timer = setTimeout(() => setIsExecuting(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [agentState.is_signing]);
+
   // PnL Dynamics: Increment on activity
   useEffect(() => {
-    if (terminalLogs.length > 0) {
-      const lastLine = terminalLogs[terminalLogs.length - 1];
+    if (agentState.logs?.length > 0) {
+      const lastLine = agentState.logs[agentState.logs.length - 1];
       if (lastLine.includes("[OK]") || lastLine.includes("[EXECUTE]") || lastLine.includes("[OPPORTUNITY]")) {
         setSimPnL(prev => prev + 0.00012);
       }
     }
-  }, [terminalLogs]);
+  }, [agentState.logs]);
 
 
   // Load chain config once
@@ -117,35 +130,8 @@ export default function DashboardPage() {
            };
            setAgentState(sanitizedData);
            
-           if (data.status !== "halted") {
-                setTerminalLogs(prev => {
-                  let newLogs = [...prev];
-                  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-                  
-                  if (data.active_symbol && data.active_symbol !== lastExecTime._lastSym) {
-                       newLogs.push(`[${time}] [PRISM] Global Scan: Best opportunity found on ${data.active_symbol}.`);
-                       lastExecTime._lastSym = data.active_symbol;
-                  }
-
-                  const mcpMsg = `[${time}] [MCP] kraken_exchange.get_ticker({"pair": "${data.active_symbol}/USD"})`;
-                  if (newLogs.length === 0 || !newLogs.some(l => l.includes(mcpMsg))) {
-                       newLogs.push(mcpMsg);
-                  }
-
-                  const tickMsg = `[${time}] [SCAN] ${data.active_symbol}: $${data.last_spot_price?.toFixed(2)} | Spread: ${data.last_spread?.toFixed(4)}% | Min: ${data.current_llm_threshold?.toFixed(4)}%`;
-                  if (newLogs.length === 0 || newLogs[newLogs.length - 1] !== tickMsg) {
-                      newLogs.push(tickMsg);
-                  }
-                  
-                  if (data.is_signing && Date.now() - (lastExecTime.time || 0) > 10000) {
-                     lastExecTime.time = Date.now();
-                     newLogs.push(`[${time}] [OK] Yield verified. Initiating TEE-signing protocol.`);
-                     newLogs.push(`[${time}] [SIG] EIP-712 Signature generated for ${data.active_symbol} trade.`);
-                  }
-
-                  if (newLogs.length > 50) return newLogs.slice(newLogs.length - 50);
-                  return newLogs;
-                });
+           if (data.logs) {
+              setTerminalLogs(data.logs);
            }
         } catch (e) {
            console.error("[WS] Parse error", e);
@@ -181,10 +167,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-fit text-gray-200 mt-2 space-y-8 pb-12 p-4 lg:p-12">
+    <div className={`min-h-fit text-gray-200 mt-2 space-y-8 pb-12 p-4 lg:p-12 transition-all duration-300 ${isExecuting ? 'bg-emerald-900/10' : ''}`}>
       {/* 1. INSTITUTIONAL HEADER */}
-      <div className="flex flex-col lg:flex-row justify-between items-center p-8 bg-black/40 rounded-[2rem] border border-white/5 shadow-[0_22px_70px_4px_rgba(0,0,0,0.56)] backdrop-blur-3xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-40" />
+      <div className={`flex flex-col lg:flex-row justify-between items-center p-8 bg-black/40 rounded-[2rem] border transition-all duration-500 ${isExecuting ? 'border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.3)]' : 'border-white/5 shadow-[0_22px_70px_4px_rgba(0,0,0,0.56)]'} backdrop-blur-3xl relative overflow-hidden`}>
+        <div className={`absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent ${isExecuting ? 'via-emerald-500' : 'via-cyan-500'} to-transparent opacity-40`} />
         
         <div className="flex flex-col items-center lg:items-start text-center lg:text-left z-10">
           <h1 className="text-4xl font-mono font-black tracking-tighter text-white">
@@ -226,7 +212,7 @@ export default function DashboardPage() {
                  </div>
                  <div className="flex justify-between items-center">
                     <span className="text-[10px] font-mono text-gray-400 uppercase">dYdX perp</span>
-                    <span className="text-sm font-mono font-black text-white">${(agentState.last_spot_price * (1 + (agentState.last_spread / 100))).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    <span className="text-sm font-mono font-black text-white">${agentState.last_perp_price?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                  </div>
                  <div className="pt-3 border-t border-white/5 flex justify-between items-center bg-emerald-500/5 -mx-6 px-6 py-2">
                     <span className="text-[10px] font-bold text-emerald-500 uppercase">Yield Spread</span>
@@ -291,18 +277,18 @@ export default function DashboardPage() {
                  </div>
                  <div className="relative h-4 bg-gray-900 rounded-full flex items-center">
                     <div className="absolute left-1/2 w-[2px] h-full bg-white/20 -ml-[1px]" />
-                    <div 
-                       className="absolute h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] transition-all duration-300 rounded-full"
-                       style={{ 
-                          left: '49.5%', 
-                          width: '1%',
-                          transform: `translateX(${(Math.random() - 0.5) * 4}px)`
-                       }}
-                    />
+                     <div 
+                        className="absolute h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] transition-all duration-300 rounded-full"
+                        style={{ 
+                           left: `${50 + (agentState.net_delta * 100)}%`, 
+                           width: '2px',
+                           transform: 'translateX(-50%)'
+                        }}
+                     />
                  </div>
                  <div className="flex justify-between mt-2 text-[8px] font-mono text-gray-600 uppercase tracking-widest">
                     <span>-10.0 Exposure</span>
-                    <span className="text-emerald-500">Net Delta: 0.002</span>
+                    <span className="text-emerald-500">Net Delta: {agentState.net_delta?.toFixed(4)}</span>
                     <span>+10.0 Exposure</span>
                  </div>
               </div>

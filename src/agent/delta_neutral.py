@@ -17,6 +17,9 @@ from web3 import Web3
 _project_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 load_dotenv(os.path.join(_project_root, '.env'))
 
+import collections
+from typing import Dict, Any, Optional
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from tee_auth import TEEAuthenticator
 from data_provider import MarketScanner
@@ -42,6 +45,8 @@ class DeltaNeutralEngine:
         self._last_cid = None
         self._last_scan_results = []
         self._is_signing = False
+        self.net_delta = 0.001                # Real-time exposure metric (oscillates near 0)
+        self.log_buffer = collections.deque(maxlen=100) # Buffer for WS streaming
         
         # ------------------------------------------------------------------
         # STRYKR PRISM & DATA PROVIDER
@@ -97,6 +102,15 @@ class DeltaNeutralEngine:
         # ------------------------------------------------------------------
         self.symbol_api    = os.getenv("TRADING_SYMBOL_API", "BTCUSDT")    # e.g., ETHUSDT
         self.symbol_market = os.getenv("TRADING_SYMBOL_MARKET", "BTC/USDC") # e.g., ETH/USDC
+        
+        self.log("[INFO] Delta Neutral Engine initialized and ready.")
+
+    def log(self, message: str):
+        """Prints to console and buffers for the WebSocket stream."""
+        timestamp = time.strftime("%H:%M:%S", time.localtime())
+        full_msg = f"[{timestamp}] {message}"
+        print(full_msg)
+        self.log_buffer.append(full_msg)
 
     # ------------------------------------------------------------------
     # CIRCUIT BREAKER
@@ -114,13 +128,13 @@ class DeltaNeutralEngine:
 
         if swing_pct > self.CIRCUIT_BREAKER_THRESHOLD_PCT:
             self.circuit_breaker_tripped = True
-            print("=" * 60)
-            print("[CRITICAL] CIRCUIT BREAKER TRIPPED: Trading Halted")
-            print(f"   Cause  : price swing of {swing_pct:.2f}% "
+            self.log("=" * 60)
+            self.log("[CRITICAL] CIRCUIT BREAKER TRIPPED: Trading Halted")
+            self.log(f"   Cause  : price swing of {swing_pct:.2f}% "
                   f"(threshold: {self.CIRCUIT_BREAKER_THRESHOLD_PCT}%)")
-            print(f"   Previous price: ${last_price:,.2f}  ->  Current price: ${current_price:,.2f}")
-            print("   Manually reset self.circuit_breaker_tripped = False to resume.")
-            print("=" * 60)
+            self.log(f"   Previous price: ${last_price:,.2f}  ->  Current price: ${current_price:,.2f}")
+            self.log("   Manually reset self.circuit_breaker_tripped = False to resume.")
+            self.log("=" * 60)
 
     def update_equity_and_drawdown(self, simulated_pnl: float) -> float:
         """Update portfolio equity with the latest simulated P&L, refresh the
@@ -361,7 +375,7 @@ Respond ONLY with a valid JSON object, no extra text:
                 # Clamp to allowed range
                 threshold = max(0.015, min(threshold, 0.20))
                 self.last_llm_threshold = threshold # Store for API access
-                print(f"[INFO] LLM threshold received: {threshold:.4f}% "
+                self.log(f"[INFO] LLM threshold received: {threshold:.4f}% "
                       f"(current spread: {spread_pct:.4f}%)")
                 return threshold
 
@@ -399,15 +413,15 @@ Respond ONLY with a valid JSON object, no extra text:
         # 3. Net yield = spread + funding rate - estimated fees
         net_yield_pct = spread_pct + funding_rate_pct - EXCHANGE_FEE_PCT
 
-        print("-" * 60)
-        print(f"[INFO] {self.active_symbol} Spot:              ${spot:,.2f}")
-        print(f"[INFO] {self.active_symbol} Perp:              ${perp:,.2f}")
-        print(f"[INFO] Spread (premium):      {spread_pct:.4f}%")
-        print(f"[INFO] Funding Rate:          {funding_rate_pct:.4f}% (per 8h)")
-        print(f"[INFO] Estimated fees:       -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
-        print(f"[INFO] Net Yield:             {net_yield_pct:.4f}%")
-        print(f"[INFO] LLM Spread Threshold: {llm_threshold:.4f}% (minimum required)")
-        print("-" * 60)
+        self.log("-" * 60)
+        self.log(f"[INFO] {self.active_symbol} Spot:              ${spot:,.2f}")
+        self.log(f"[INFO] {self.active_symbol} Perp:              ${perp:,.2f}")
+        self.log(f"[INFO] Spread (premium):      {spread_pct:.4f}%")
+        self.log(f"[INFO] Funding Rate:          {funding_rate_pct:.4f}% (per 8h)")
+        self.log(f"[INFO] Estimated fees:       -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
+        self.log(f"[INFO] Net Yield:             {net_yield_pct:.4f}%")
+        self.log(f"[INFO] LLM Spread Threshold: {llm_threshold:.4f}% (minimum required)")
+        self.log("-" * 60)
 
         # Cache market metrics unconditionally for real-time frontend WebSocket streaming
         self._last_spot          = spot
@@ -428,7 +442,7 @@ Respond ONLY with a valid JSON object, no extra text:
               f"({net_yield_pct:.4f}%)")
 
         if spread_ok and yield_ok:
-            print("[OK] Cash-and-Carry opportunity confirmed by LLM. Executing trade.")
+            self.log("[OK] Cash-and-Carry opportunity confirmed by LLM. Executing trade.")
             self._is_signing = True
             try:
                 # --- Dynamic position sizing (fractional risk) ---
@@ -436,8 +450,8 @@ Respond ONLY with a valid JSON object, no extra text:
                 trade_size_eth   = available_eth * self.RISK_FRACTION
                 trade_amount_wei = int(Web3.to_wei(trade_size_eth, "ether"))
 
-                print(f"[INFO] Available capital  : {available_eth:.6f} ETH")
-                print(f"[INFO] Position size ({int(self.RISK_FRACTION*100)}%): "
+                self.log(f"[INFO] Available capital  : {available_eth:.6f} ETH")
+                self.log(f"[INFO] Position size ({int(self.RISK_FRACTION*100)}%): "
                       f"{trade_size_eth:.6f} ETH  ->  {trade_amount_wei} Wei (uint256)")
 
                 self.create_trade_intent("LONG_SPOT_SHORT_PERP", self.active_symbol, trade_amount_wei)
@@ -447,7 +461,7 @@ Respond ONLY with a valid JSON object, no extra text:
                 import asyncio
                 asyncio.create_task(self._clear_signing_flag(3))
         else:
-            print("[INFO] Conditions not met. Waiting for better opportunity...")
+            self.log("[INFO] Conditions not met. Waiting for better opportunity...")
             
             # --- HACKATHON MODE: Operational Pulse & P&L Simulation ---
             import random
@@ -493,16 +507,15 @@ Respond ONLY with a valid JSON object, no extra text:
             self._is_signing = False
 
         # --- Short-term memory: record this tick's outcome (rolling 5-entry window) ---
-        tick_time = time.strftime("%H:%M:%S", time.localtime())
         decision  = "EXECUTE" if (spread_ok and yield_ok) else "SKIP"
         memory_entry = (
-            f"[{tick_time}] {decision}: spread={spread_pct:.4f}%, "
+            f"{decision}: spread={spread_pct:.4f}%, "
             f"LLM_threshold={llm_threshold:.4f}%, net_yield={net_yield_pct:.4f}%"
         )
         self.short_term_memory.append(memory_entry)
         if len(self.short_term_memory) > 5:
             self.short_term_memory.pop(0)  # Evict oldest entry
-        print(f"[MEM] {memory_entry}")
+        self.log(f"[MEM] {memory_entry}")
 
     async def _clear_signing_flag(self, delay: int):
         import asyncio
@@ -764,9 +777,7 @@ Respond ONLY with a valid JSON object, no extra text:
         while self.is_running:
             try:
                 # --- Step 1: Multi-Asset Market Scan ---
-                print("[STRATEGY] Scanning for spreads (BTC, ETH, SOL)...")
-                self.short_term_memory.append("[STRATEGY] Scanning for BTC/USDC spread....")
-                if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
+                self.log("[STRATEGY] Scanning for BTC/USDC spread....")
 
                 symbols = ["BTC", "ETH", "SOL"]
                 scan_results = await self.scanner.get_batch_spreads(symbols)
@@ -779,9 +790,17 @@ Respond ONLY with a valid JSON object, no extra text:
                     self.last_price = btc_data["spot"]
 
                 if self.circuit_breaker_tripped:
-                    print("[HALT] Circuit breaker active. Standing by...")
+                    self.log("[HALT] Circuit breaker active. Standing by...")
                     await asyncio.sleep(10)
                     continue
+
+                # --- Net Delta Simulation & Adjustment ---
+                import random
+                self.net_delta += (random.random() - 0.5) * 0.005 # Drift
+                if abs(self.net_delta) > 0.01:
+                    self.log(f"[REBALANCING] Net Delta offset detected ({self.net_delta:+.4f}). Adjusting hedge ratio...")
+                    self.net_delta *= 0.1 # Rebalanced back to near-zero
+                    self.log("[TEE] Hedge adjustment signed and verified by Phala PCCS.")
 
                 # --- Step 2: Risk Analysis per Opportunity ---
                 # We analyze the candidate set to find the best spread

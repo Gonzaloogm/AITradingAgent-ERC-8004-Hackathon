@@ -373,6 +373,8 @@ async def websocket_stream(websocket: WebSocket):
                     "current_equity": trading_engine.current_equity,
                     "peak_equity": trading_engine.peak_equity,
                     "short_term_memory": trading_engine.short_term_memory,
+                    "logs": list(trading_engine.log_buffer),
+                    "net_delta": getattr(trading_engine, "net_delta", 0.0),
                     "latest_cid": getattr(trading_engine, "_last_cid", None),
                     "scan_results": getattr(trading_engine, "_last_scan_results", []),
                     "active_symbol": getattr(trading_engine, "active_symbol", "BTC"),
