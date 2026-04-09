@@ -13,10 +13,7 @@ export default function App() {
         <Layout>
           <Routes>
             <Route path="/"          element={<DashboardPage />} />
-            <Route path="/funding"   element={<FundingPage />} />
-            <Route path="/developer" element={<DeveloperPage />} />
             <Route path="/results"   element={<ResultsPage />} />
-            {/* Fallback */}
             <Route path="*"          element={<DashboardPage />} />
           </Routes>
         </Layout>

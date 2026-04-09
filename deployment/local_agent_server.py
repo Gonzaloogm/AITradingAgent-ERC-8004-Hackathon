@@ -233,6 +233,13 @@ async def startup_event():
 
   print(f"\n Initializing TEE identity (Mode: {'HARDWARE' if effective_use_tee else 'MOCK'})...")
   private_key = os.getenv("PRIVATE_KEY")
+  
+  # Fail-safe for mock mode: ensure we have a key to derive identity
+  if not effective_use_tee and not private_key:
+      # Use a deterministic placeholder for the hackathon demo if no key provided
+      print("[INFO] No PRIVATE_KEY found in .env. Using deterministic demo key for MOCK mode.")
+      private_key = "0x" + keccak(text=f"demo-key-{salt}").hex()
+
   tee_auth = TEEAuthenticator(
       domain=domain,
       salt=salt,

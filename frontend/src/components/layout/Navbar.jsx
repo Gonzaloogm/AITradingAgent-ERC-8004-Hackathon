@@ -5,8 +5,6 @@ import { formatAddress } from '../../utils/formatters';
 
 const navLinks = [
   { to: '/',          label: 'Dashboard',  icon: '⬡' },
-  { to: '/funding',   label: 'Funding',    icon: '◈' },
-  { to: '/developer', label: 'Developer',  icon: '◉' },
   { to: '/results',   label: 'Live Ops',   icon: '◎' },
 ];
 
