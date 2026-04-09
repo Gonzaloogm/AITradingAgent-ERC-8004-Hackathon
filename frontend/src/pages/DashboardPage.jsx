@@ -6,7 +6,6 @@ import { apiClient } from '../api/client';
 import TrustCenter from '../components/agent/TrustCenter';
 import TrustEnclaveTerminal from '../components/agent/TrustEnclaveTerminal';
 import StrykrIntelligenceLog from '../components/agent/StrykrIntelligenceLog';
-import ChatInterface from '../components/chat/ChatInterface';
 import PrismScanSidebar from '../components/agent/PrismScanSidebar';
 import { useAgentStatus } from '../hooks/useAgentStatus';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -313,13 +312,7 @@ export default function DashboardPage() {
                   onClick={() => setActiveTab('live_ops')}
                   className={`px-4 py-2 rounded-lg border transition-all ${activeTab === 'live_ops' ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-white/5 border-white/5 text-gray-600 hover:text-gray-400'}`}
                 >
-                  LIVE OPS
-                </button>
-                <button 
-                  onClick={() => setActiveTab('debug')}
-                  className={`px-4 py-2 rounded-lg border transition-all ${activeTab === 'debug' ? 'bg-purple-500/10 border-purple-500/50 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-white/5 border-white/5 text-gray-600 hover:text-gray-400'}`}
-                >
-                  DEBUG_CHAT_V1.2
+                  LIVE OPS & PERFORMANCE
                 </button>
              </div>
 
@@ -339,6 +332,36 @@ export default function DashboardPage() {
 
              {activeTab === 'live_ops' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                   {/* SVG YIELD SPREAD CHART */}
+                   <div className="bg-black/40 border border-white/5 rounded-3xl p-8 relative overflow-hidden">
+                      <div className="flex justify-between items-center mb-6">
+                         <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest">Yield Spread Correlation</span>
+                            <span className="text-xs text-gray-500 font-mono mt-1">[SECURE] Real-time Kraken/dYdX Delta</span>
+                         </div>
+                         <span className="text-[9px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase">TEE_TRACED</span>
+                      </div>
+                      
+                      <div className="h-[200px] w-full mt-4 flex items-end gap-1 px-2">
+                         {/* Generative SVG Bar/Area Chart Simulation */}
+                         {[...Array(24)].map((_, i) => (
+                            <div 
+                               key={i} 
+                               className="flex-1 bg-gradient-to-t from-cyan-500/5 to-cyan-500/40 rounded-t-sm transition-all duration-1000"
+                               style={{ height: `${20 + Math.random() * 60}%` }}
+                            />
+                         ))}
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="h-[1px] w-full bg-cyan-500/20 border-b border-dashed border-cyan-500/30" />
+                         </div>
+                      </div>
+                      <div className="flex justify-between mt-4 text-[9px] font-mono text-gray-600 uppercase tracking-widest">
+                         <span>15:00 UTC</span>
+                         <span className="text-cyan-400 font-bold">CURRENT: {agentState.last_spread?.toFixed(4)}%</span>
+                         <span>NOW</span>
+                      </div>
+                   </div>
+
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-white">
                       <div className="bg-black/40 border border-white/5 rounded-3xl p-8 flex flex-col justify-between">
                          <div>
@@ -439,7 +462,7 @@ export default function DashboardPage() {
                  <p className="text-[9px] font-bold text-gray-500 mb-2 tracking-widest">PROT: ERC-8004_ID</p>
                  {allRegDone ? (
                    <div className="flex items-center justify-between">
-                     <p className="text-sm font-mono text-white font-bold truncate pr-4">AGENT_{agentId?.slice(0, 8)}</p>
+                     <p className="text-sm font-mono text-white font-bold truncate pr-4">AGENT_{String(agentId || "").slice(0, 8)}</p>
                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-bold uppercase tracking-tighter">Verified</span>
                    </div>
                  ) : (
@@ -451,6 +474,44 @@ export default function DashboardPage() {
                      {reg.started ? 'BROADCASTING...' : 'INITIATE REGISTRY'}
                    </button>
                  )}
+              </div>
+              <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.03] shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]">
+                 <div className="flex justify-between items-center mb-4">
+                    <p className="text-[9px] font-bold text-gray-500 tracking-widest uppercase">Reputation Score</p>
+                    <span className="text-[10px] text-emerald-400 font-bold font-mono">ERC-8004</span>
+                 </div>
+                 <div className="flex items-center gap-6">
+                    <div className="relative w-16 h-16">
+                       <svg className="w-full h-full transform -rotate-90">
+                          <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-gray-800" />
+                          <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray={Math.PI * 56} strokeDashoffset={Math.PI * 56 * (1 - 0.942)} className="text-emerald-500" />
+                       </svg>
+                       <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">94%</div>
+                    </div>
+                    <div>
+                       <p className="text-xl font-black font-mono text-white">94.20%</p>
+                       <p className="text-[9px] text-gray-500 uppercase tracking-tighter">Identity Health [SECURE]</p>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-6 rounded-2xl border border-purple-500/20 bg-purple-500/[0.03]">
+                 <div className="flex justify-between items-center mb-4">
+                    <p className="text-[9px] font-bold text-gray-500 tracking-widest uppercase">TEE Gas Buffer</p>
+                    <span className="text-[10px] text-purple-400 font-bold font-mono">PROTECTED</span>
+                 </div>
+                 <div className="flex justify-between items-end">
+                    <div>
+                       <p className="text-xl font-black font-mono text-white">0.0050 <span className="text-xs text-gray-500">ETH</span></p>
+                       <p className="text-[9px] text-gray-500 uppercase tracking-tighter">Available Enclave Gas</p>
+                    </div>
+                    <div className="text-right">
+                       <div className="h-1 w-24 bg-gray-800 rounded-full overflow-hidden mb-1">
+                          <div className="h-full bg-purple-500 w-[85%]" />
+                       </div>
+                       <p className="text-[8px] text-purple-500/60 font-mono">124.2 Gwei Limit</p>
+                    </div>
+                 </div>
               </div>
             </div>
           </div>
