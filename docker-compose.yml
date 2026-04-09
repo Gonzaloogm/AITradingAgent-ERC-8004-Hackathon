@@ -9,6 +9,7 @@ services:
       - AGENT_SALT=${AGENT_SALT}
       - RPC_URL=${RPC_URL}
       - CHAIN_ID=${CHAIN_ID}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - REDPILL_API_KEY=${REDPILL_API_KEY}
     ports:
       - "80:80"

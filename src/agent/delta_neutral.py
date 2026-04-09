@@ -71,19 +71,25 @@ class DeltaNeutralEngine:
         )
 
         # ------------------------------------------------------------------
-        # LLM ADAPTIVE RISK ANALYZER (OpenRouter / RedPill)
+        # LLM ADAPTIVE RISK ANALYZER (Groq Migration)
         # ------------------------------------------------------------------
-        api_key  = os.getenv("REDPILL_API_KEY") or os.getenv("FREE_LLM_API_KEY")
-        base_url = os.getenv("FREE_LLM_BASE_URL", "https://openrouter.ai/api/v1")
+        groq_key = os.getenv("GROQ_API_KEY")
+        api_key  = groq_key or os.getenv("REDPILL_API_KEY") or os.getenv("FREE_LLM_API_KEY")
+        
+        # Default to Groq base URL if using Groq key, otherwise keep OpenRouter
+        default_base = "https://api.groq.com/openai/v1" if groq_key else "https://openrouter.ai/api/v1"
+        base_url = os.getenv("GROQ_BASE_URL") or os.getenv("FREE_LLM_BASE_URL", default_base)
         
         if not api_key:
-            print("[WARN] No LLM API Key (REDPILL_API_KEY / FREE_LLM_API_KEY) found. "
+            print("[WARN] No LLM API Key (GROQ_API_KEY / REDPILL_API_KEY) found. "
                   "LLM will use the default threshold each tick.")
+        
         self.llm_client = openai.AsyncOpenAI(
             api_key=api_key or "no-key",
             base_url=base_url,
         )
-        self.llm_model = os.getenv("LLM_MODEL", "meta-llama/llama-3-8b-instruct")
+        # Standard model for Groq: llama3-70b-8192
+        self.llm_model = os.getenv("LLM_MODEL", "llama3-70b-8192")
         
         # ------------------------------------------------------------------
         # TRADING SYMBOLS (Dynamic for swarm deployment)
