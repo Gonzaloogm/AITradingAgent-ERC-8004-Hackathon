@@ -18,7 +18,7 @@ function getOrCreateSession() {
 
 const GREETING = {
   role: 'assistant',
-  content: `Hello! I'm your **TEE Agent** running in a secure Intel TDX enclave.\n\nI can help you:\n- Check wallet balance and sign messages\n- Generate attestation proofs\n- Query registration and reputation status\n- Run Python or shell scripts\n- Explore agent capabilities\n\nWhat would you like to do?`,
+  content: `### TEE Agent Auditor V1.0 Connected\n\nI am the autonomous supervisor of the AGENT-4108-TDX strategy. You can audit my enclave state by asking about:\n- **Hardware Security**: "What is your attestation status?"\n- **Trading Logic**: "Explain your Delta-Neutral strategy."\n- **Portfolio Audit**: "Show me your current equity and realized gains."\n\nI am currently running inside a **SECURED INTEL TDX ENCLAVE**.`,
 };
 
 export default function ChatInterface() {
@@ -30,6 +30,9 @@ export default function ChatInterface() {
   const textareaRef                 = useRef(null);
   const toast                       = useToast();
 
+  // ... (rest of the logic remains the same, but I'll update the render part below)
+  // [NOTE: I'll skip to the return block to save tokens but keeping logic intact]
+  
   // Load history on mount
   useEffect(() => {
     (async () => {
@@ -44,7 +47,6 @@ export default function ChatInterface() {
     })();
   }, [sessionId]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -106,7 +108,7 @@ export default function ChatInterface() {
       setSessionId(newId);
       localStorage.setItem(SESSION_KEY, newId);
       setMessages([GREETING]);
-      toast('New session started', 'success');
+      toast('Audit session cleared', 'success');
     }
   };
 
@@ -124,38 +126,33 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="glass-panel flex flex-col" style={{ height: 'calc(100vh - 200px)', minHeight: '500px' }}>
+    <div className="bg-black/60 border border-white/5 rounded-[2.5rem] flex flex-col h-[450px] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🤖</span>
+      <div className="flex items-center justify-between px-8 py-4 border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">🛡️</div>
           <div>
-            <p className="text-sm font-semibold text-white">TEE Agent Chat</p>
-            <p className="text-xs text-gray-500 font-mono">Intel TDX Secured</p>
+            <p className="text-xs font-black text-white uppercase tracking-widest">Agent Auditor V1.0</p>
+            <p className="text-[10px] text-emerald-500/60 font-mono uppercase">Internal Integrity Stream</p>
           </div>
         </div>
         <button
           onClick={handleNewSession}
-          className="text-xs px-3 py-1.5 rounded-lg border border-white/[0.08] text-gray-400 hover:text-white hover:bg-white/[0.06] transition-colors"
+          className="text-[10px] px-3 py-1 rounded-lg border border-white/10 text-gray-500 hover:text-white hover:bg-white/5 transition-all font-mono uppercase"
         >
-          New Session
+          Reset Logs
         </button>
       </div>
 
-      {/* Quick actions */}
-      <div className="px-4 pt-3">
-        <QuickActions onAction={handleQuickAction} disabled={loading} />
-      </div>
-
       {/* Messages */}
-      <div className="chat-messages flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="chat-messages flex-1 overflow-y-auto px-8 py-6 space-y-6 font-sans">
         {messages.map((msg, i) =>
           msg.role === 'typing' ? (
-            <div key="typing" className="flex gap-3 animate-fadein">
-              <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-cyan-900/60 border border-cyan-500/30 text-base">🤖</div>
-              <div className="rounded-2xl rounded-tl-sm px-4 py-3 bg-white/[0.04] border border-white/[0.08] flex items-center gap-2">
-                <LoadingSpinner size="sm" color="cyan" />
-                <span className="text-xs text-gray-500">Thinking...</span>
+            <div key="typing" className="flex gap-4 animate-fadein">
+              <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-gray-900 border border-white/10 text-xs">🤖</div>
+              <div className="rounded-2xl rounded-tl-sm px-5 py-3 bg-white/[0.02] border border-white/[0.04] flex items-center gap-2">
+                <LoadingSpinner size="sm" color="emerald" />
+                <span className="text-[11px] text-gray-500 font-mono">AUDITING ENCLAVE...</span>
               </div>
             </div>
           ) : (
@@ -166,29 +163,28 @@ export default function ChatInterface() {
       </div>
 
       {/* Input */}
-      <div className="px-4 pb-4 pt-2 border-t border-white/[0.06]">
-        <div className="flex items-end gap-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2 focus-within:border-cyan-500/40 transition-colors">
+      <div className="px-8 pb-8 pt-4">
+        <div className="flex items-end gap-3 bg-white/[0.02] border border-white/10 rounded-2xl px-6 py-3 focus-within:border-emerald-500/40 transition-all">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
+            placeholder="Pregunta al agente sobre su estado de seguridad o balance de trading..."
             rows={1}
             disabled={loading}
-            className="flex-1 bg-transparent resize-none text-sm text-gray-200 placeholder-gray-600 outline-none font-sans py-1 leading-relaxed disabled:opacity-50"
-            style={{ maxHeight: '160px' }}
+            className="flex-1 bg-transparent resize-none text-[13px] text-gray-300 placeholder-gray-700 outline-none font-sans py-1 leading-relaxed disabled:opacity-50"
+            style={{ maxHeight: '100px' }}
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={loading || !input.trim()}
-            className="flex-shrink-0 w-9 h-9 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-400
-              hover:bg-cyan-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center text-lg"
+            className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400
+              hover:bg-emerald-500/20 disabled:opacity-10 transition-all flex items-center justify-center"
           >
-            {loading ? <LoadingSpinner size="sm" /> : '↑'}
+            {loading ? <LoadingSpinner size="sm" /> : '→'}
           </button>
         </div>
-        <p className="text-xs text-gray-700 mt-1.5 text-center font-mono">Session: {sessionId.slice(0, 8)}…</p>
       </div>
     </div>
   );

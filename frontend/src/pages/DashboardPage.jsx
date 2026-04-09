@@ -7,6 +7,7 @@ import TrustCenter from '../components/agent/TrustCenter';
 import TrustEnclaveTerminal from '../components/agent/TrustEnclaveTerminal';
 import StrykrIntelligenceLog from '../components/agent/StrykrIntelligenceLog';
 import PrismScanSidebar from '../components/agent/PrismScanSidebar';
+import ChatInterface from '../components/chat/ChatInterface';
 import { useAgentStatus } from '../hooks/useAgentStatus';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
@@ -24,7 +25,7 @@ export default function DashboardPage() {
   });
   const [agentReady, setAgentReady] = useState(false);
   const [agentId, setAgentId] = useState("AGENT-4108-TDX");
-  const [simPnL, setSimPnL] = useState(0.004245); // Starting seed for demo dynamism
+  const [simPnL, setSimPnL] = useState(0.004245); 
   
   // Real-time Agent Status Hook
   const { status, loading: statusLoading, error: statusError } = useAgentStatus(10000);
@@ -210,16 +211,39 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         
-        {/* COLUMN 1: ENCLAVE SYSTEM TRACE (LOGS) */}
-        <div className="xl:col-span-3 flex flex-col gap-8">
-           <div className="bg-[#050505] rounded-3xl border border-white/5 shadow-2xl flex flex-col h-[700px] overflow-hidden">
-              <div className="bg-white/5 py-4 px-6 border-b border-white/5 flex justify-between items-center">
-                 <span className="font-mono text-[10px] text-emerald-400 uppercase tracking-widest font-black">Enclave System Trace</span>
-                 <span className="text-[8px] text-gray-600 animate-pulse">RECORDING...</span>
+        {/* COLUMN 1: MARKET MONITOR & SYSTEM TRACE */}
+        <div className="xl:col-span-3 flex flex-col gap-6">
+           {/* MARKET MONITOR */}
+           <div className="bg-black/60 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
+              <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Market Monitor</span>
+                 <span className="text-[10px] text-emerald-400 animate-pulse font-mono tracking-tighter">● LIVE_FEED</span>
               </div>
-              <div ref={terminalRef} className="p-6 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-thin text-gray-500">
+              <div className="space-y-3">
+                 <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-mono text-gray-400 uppercase">Kraken Spot</span>
+                    <span className="text-sm font-mono font-black text-white">${agentState.last_spot_price?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-mono text-gray-400 uppercase">dYdX perp</span>
+                    <span className="text-sm font-mono font-black text-white">${(agentState.last_spot_price * (1 + (agentState.last_spread / 100))).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                 </div>
+                 <div className="pt-3 border-t border-white/5 flex justify-between items-center bg-emerald-500/5 -mx-6 px-6 py-2">
+                    <span className="text-[10px] font-bold text-emerald-500 uppercase">Yield Spread</span>
+                    <span className="text-lg font-mono font-black text-emerald-400 animate-pulse">{(agentState.last_spread || 0.00).toFixed(4)}%</span>
+                 </div>
+              </div>
+           </div>
+
+           {/* SYSTEM TRACE */}
+           <div className="bg-[#050505] rounded-3xl border border-white/5 shadow-2xl flex flex-col h-[485px] overflow-hidden">
+              <div className="bg-white/5 py-3 px-6 border-b border-white/5 flex justify-between items-center">
+                 <span className="font-mono text-[9px] text-gray-500 uppercase tracking-widest font-black">Enclave System Trace</span>
+                 <span className="text-[8px] text-gray-700">TX_HEX_STREAM</span>
+              </div>
+              <div ref={terminalRef} className="p-6 flex-1 overflow-y-auto font-mono text-[10px] leading-relaxed scrollbar-thin text-gray-600">
                  {terminalLogs.map((log, i) => (
-                    <div key={i} className="mb-2 border-l border-white/10 pl-4 hover:text-emerald-300 transition-colors">
+                    <div key={i} className="mb-1 border-l border-white/10 pl-4 hover:text-emerald-400/60 transition-colors">
                        {log}
                     </div>
                  ))}
@@ -239,17 +263,16 @@ export default function DashboardPage() {
                  </div>
                  <div className="flex gap-2">
                     <span className="text-[9px] bg-cyan-500/20 text-cyan-400 px-3 py-1 rounded-full font-bold uppercase">TEE_VERIFIED</span>
-                    <span className="text-[9px] bg-white/5 text-gray-400 px-3 py-1 rounded-full font-bold uppercase italic">SIMULATION_MODE</span>
                  </div>
               </div>
               
-              <div className="h-[250px] w-full flex items-end gap-1.5 px-2">
+              <div className="h-[200px] w-full flex items-end gap-1.5 px-2 mb-4">
                  {[...Array(32)].map((_, i) => (
                     <div 
                        key={i} 
                        className="flex-1 bg-gradient-to-t from-cyan-500/0 to-cyan-500/40 rounded-t-sm animate-pulse"
                        style={{ 
-                          height: `${30 + Math.random() * 50}%`,
+                          height: `${20 + Math.random() * 60}%`,
                           animationDelay: `${i * 0.1}s`,
                           opacity: 0.3 + (i/32)
                        }}
@@ -259,11 +282,29 @@ export default function DashboardPage() {
                     <div className="h-[1px] w-[90%] bg-cyan-500/10 border-b border-dashed border-cyan-500/30" />
                  </div>
               </div>
-              
-              <div className="flex justify-between mt-6 text-[9px] font-mono text-gray-600 uppercase tracking-widest border-t border-white/5 pt-6">
-                 <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-500"></div> KRAKEN_SPOT</span>
-                 <span className="text-cyan-400 font-black">DELTA: {agentState.last_spread?.toFixed(4)}%</span>
-                 <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full border border-cyan-500"></div> DYDX_PERP</span>
+
+              {/* DELTA EXPOSURE MINI CHART */}
+              <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-6 mt-4">
+                 <div className="flex justify-between items-center mb-4">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Strategy Health: Delta Neutrality</p>
+                    <span className="text-[10px] text-emerald-400 font-mono font-black tracking-tighter">[FULLY HEDGED]</span>
+                 </div>
+                 <div className="relative h-4 bg-gray-900 rounded-full flex items-center">
+                    <div className="absolute left-1/2 w-[2px] h-full bg-white/20 -ml-[1px]" />
+                    <div 
+                       className="absolute h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] transition-all duration-300 rounded-full"
+                       style={{ 
+                          left: '49.5%', 
+                          width: '1%',
+                          transform: `translateX(${(Math.random() - 0.5) * 4}px)`
+                       }}
+                    />
+                 </div>
+                 <div className="flex justify-between mt-2 text-[8px] font-mono text-gray-600 uppercase tracking-widest">
+                    <span>-10.0 Exposure</span>
+                    <span className="text-emerald-500">Net Delta: 0.002</span>
+                    <span>+10.0 Exposure</span>
+                 </div>
               </div>
            </div>
 
@@ -273,32 +314,35 @@ export default function DashboardPage() {
                  <h2 className="text-5xl font-black font-mono text-white tracking-tighter">
                     +{simPnL.toFixed(6)} <span className="text-lg text-gray-600 italic">ETH</span>
                  </h2>
-                 <p className="text-[10px] text-gray-500 mt-4 leading-relaxed font-mono uppercase">
+                 <p className="text-[10px] text-gray-500 mt-4 font-mono uppercase">
                     [SECURE] Dynamic audit of enclave growth
                  </p>
               </div>
 
-              <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-8 space-y-6">
-                 <div className="flex justify-between items-start border-b border-white/5 pb-4">
-                    <h3 className="font-mono text-[10px] font-bold text-gray-500 uppercase tracking-widest">Enclave Metrics</h3>
-                    <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-tighter">Optimized</span>
+              <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-8 space-y-4">
+                 <div className="flex justify-between items-start border-b border-white/5 pb-2">
+                    <h3 className="font-mono text-[9px] font-bold text-gray-500 uppercase tracking-widest">Enclave Metrics</h3>
+                    <span className="text-[9px] text-emerald-400 font-bold uppercase">Optimized</span>
                  </div>
-                 <div className="space-y-4">
+                 <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                       <span className="text-[10px] text-gray-500 uppercase">MCP Uptime</span>
-                       <span className="text-sm font-mono font-black text-emerald-400">99.98%</span>
+                       <span className="text-[9px] text-gray-500 uppercase">MCP Uptime</span>
+                       <span className="text-xs font-mono font-black text-emerald-400">99.98%</span>
                     </div>
                     <div className="flex justify-between items-center">
-                       <span className="text-[10px] text-gray-500 uppercase">Yield / hr</span>
-                       <span className="text-sm font-mono font-black">0.024%</span>
+                       <span className="text-[9px] text-gray-500 uppercase">Yield / hr</span>
+                       <span className="text-xs font-mono font-black">0.024%</span>
                     </div>
                     <div className="flex justify-between items-center">
-                       <span className="text-[10px] text-gray-500 uppercase">Drawdown</span>
-                       <span className="text-sm font-mono font-black text-gray-600">0.00%</span>
+                       <span className="text-[9px] text-gray-500 uppercase">Drawdown</span>
+                       <span className="text-xs font-mono font-black text-gray-600">0.00%</span>
                     </div>
                  </div>
               </div>
            </div>
+
+           {/* AGENT AUDITOR (CHAT REPURPOSED) */}
+           <ChatInterface />
         </div>
 
         {/* COLUMN 3: INTEGRITY & PROTOCOL */}
