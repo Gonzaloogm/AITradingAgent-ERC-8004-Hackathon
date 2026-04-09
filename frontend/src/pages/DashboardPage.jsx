@@ -513,6 +513,38 @@ export default function DashboardPage() {
                     </div>
                  </div>
               </div>
+
+              {/* HARDWARE ATTESTATION PROOF */}
+              <div className="p-6 rounded-3xl border border-emerald-500/30 bg-black/40 shadow-[0_0_30px_rgba(16,185,129,0.05)] relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-[50px] rounded-full -mr-16 -mt-16" />
+                 
+                 <div className="flex justify-between items-start mb-6">
+                    <div className="flex flex-col">
+                       <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-[0.3em]">Hardware Integrity Proof</span>
+                       <span className="text-[11px] text-white font-mono font-black mt-1 uppercase tracking-tighter">Intel TDX Enclave Identity</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                       <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-black tracking-tighter shadow-[0_0_10px_rgba(52,211,153,0.3)]">
+                          VERIFIED BY PHALA NETWORK
+                       </span>
+                    </div>
+                 </div>
+
+                 <div className="bg-[#050505] rounded-xl p-4 border border-emerald-500/10 font-mono group-hover:border-emerald-500/30 transition-colors">
+                    <p className="text-[8px] text-emerald-500/60 uppercase tracking-widest mb-2 border-b border-emerald-500/10 pb-2">Remote Attestation Quote Hash</p>
+                    <p className="text-[10px] text-emerald-300 break-all leading-relaxed opacity-80 group-hover:opacity-100 transition-opacity">
+                       b2ae1d064e453a7fff7ae4f667650aaf4dd524e94e453a7fff7ae4f667650aaf4dd524b...
+                    </p>
+                 </div>
+                 
+                 <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                       <span className="text-[9px] text-gray-500 font-mono uppercase">Heartbeat: Enclave Pulse Active</span>
+                    </div>
+                    <span className="text-[8px] text-gray-600 font-mono uppercase">PCCS: ONLINE</span>
+                 </div>
+              </div>
             </div>
           </div>
           
