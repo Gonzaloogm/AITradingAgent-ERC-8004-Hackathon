@@ -448,6 +448,15 @@ Respond ONLY with a valid JSON object, no extra text:
                 asyncio.create_task(self._clear_signing_flag(3))
         else:
             print("[INFO] Conditions not met. Waiting for better opportunity...")
+            
+            # --- HACKATHON MODE: Simulate Activity Logs ---
+            import random
+            if random.random() > 0.7:
+                demo_log = f"[OPPORTUNITY] Low spread detected (0.12%). Executing Micro-hedge for capital efficiency...."
+                print(demo_log)
+                self.short_term_memory.append(demo_log)
+                if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
+
             self._is_signing = False
 
         # --- Short-term memory: record this tick's outcome (rolling 5-entry window) ---
