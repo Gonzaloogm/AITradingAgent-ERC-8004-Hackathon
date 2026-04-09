@@ -40,8 +40,8 @@ export default function FundingPage() {
     try {
       const addr = await walletMgr.connect();
       setUserAddress(addr);
-      const bal = await walletMgr.getBalance(addr);
-      setUserBalance(formatEth(bal));
+      const balStr = await walletMgr.getBalance(addr);
+      setUserBalance(balStr);
       setConnected(true);
       toast('Wallet connected!', 'success');
     } catch (e) {
@@ -60,26 +60,26 @@ export default function FundingPage() {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { toast('Enter a valid amount', 'error'); return; }
 
-    // TARGET OVERRIDE: Prioritize demo address for hackathon stability
-    const targetAddress = '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425';
+    // TARGET: Agent's TEE-generated address (or fallback)
+    const targetAddress = wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425';
     
     setSending(true);
-    setTxStatus({ type: 'pending', message: 'Broadcasting to Sepolia...' });
+    setTxStatus({ type: 'pending', message: 'Requesting signature via MetaMask...' });
     
     try {
-      console.log(`[MetaMask] Sending ${amt} ETH to ${targetAddress}...`);
+      console.log(`[Ethers] Sending ${amt} ETH from ${userAddress} to ${targetAddress}...`);
       const txHash = await walletMgr.sendTransaction(targetAddress, amt);
       
       const explorerBase = chainConfig?.block_explorer_urls?.[0];
       const explorerUrl = explorerBase ? `${explorerBase}/tx/${txHash}` : null;
       
-      setTxStatus({ type: 'success', message: 'Transaction successful!', txHash, explorerUrl });
+      setTxStatus({ type: 'success', message: 'Transaction broadcasted!', txHash, explorerUrl });
       toast('Success! Agent fueling complete.', 'success');
       
       // Auto-refresh wallet state after success
-      setTimeout(() => { refetch(); }, 10000);
+      setTimeout(() => { refetch(); }, 12000);
     } catch (e) {
-      console.error('[MetaMask] Transaction failed:', e);
+      console.error('[Ethers] Transaction failed:', e);
       const errorMsg = e.message?.includes('user rejected') ? 'Transaction rejected by user' : e.message;
       setTxStatus({ type: 'error', message: errorMsg });
       toast(errorMsg, 'error');
@@ -202,8 +202,8 @@ export default function FundingPage() {
           <div className="space-y-4">
             {/* Connected wallet info */}
             <div className="bg-black/20 border border-white/[0.06] rounded-lg px-4 py-3">
-              <p className="text-xs text-gray-500 mb-1">Connected Wallet</p>
-              <p className="font-mono text-sm text-gray-200">{formatAddress(userAddress)}</p>
+              <p className="text-xs text-gray-500 mb-1">Personal Funding Account (MetaMask)</p>
+              <p className="font-mono text-sm text-white">{formatAddress(userAddress)}</p>
               <p className="text-xs text-gray-500 mt-1">Balance: <span className="text-white">{userBalance} ETH</span></p>
             </div>
 
