@@ -76,17 +76,30 @@ export class WalletManager {
   }
 
   async sendTransaction(toAddress, amountInEth) {
-    if (!this.connected || !this.signer) throw new Error('Wallet not connected');
+    if (!this.connected || !this.provider) throw new Error('Wallet not connected');
 
     try {
-      const tx = await this.signer.sendTransaction({
+      // Always get a FRESH signer at the time of transaction
+      const currentSigner = await this.provider.getSigner();
+      const fromAddress = await currentSigner.getAddress();
+      
+      console.log(`[WalletManager] Initiating TEE Fueling:`);
+      console.log(` - From (User): ${fromAddress}`);
+      console.log(` - To (Agent): ${toAddress}`);
+      console.log(` - Amount: ${amountInEth} ETH`);
+
+      if (fromAddress.toLowerCase() === toAddress.toLowerCase()) {
+        throw new Error("Self-Funding Lock: You are currently connected with the agent's account in MetaMask. Please switch to your personal account to send fuel.");
+      }
+
+      const tx = await currentSigner.sendTransaction({
         to: toAddress,
         value: ethers.parseEther(amountInEth.toString())
       });
       
       return tx.hash;
     } catch (error) {
-      console.error("[WalletManager] Send error:", error);
+      console.error("[WalletManager] Transaction processing error:", error);
       throw error;
     }
   }

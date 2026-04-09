@@ -63,11 +63,22 @@ export default function FundingPage() {
     // TARGET: Agent's TEE-generated address (or fallback)
     const targetAddress = wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425';
     
+    // GUARD: Ensure user is not sending to themselves
+    if (userAddress.toLowerCase() === targetAddress.toLowerCase()) {
+      const errorMsg = "Self-Funding Error: You have the Agent's account selected in MetaMask. Please switch to your personal account.";
+      setTxStatus({ type: 'error', message: errorMsg });
+      toast(errorMsg, 'error');
+      return;
+    }
+
     setSending(true);
-    setTxStatus({ type: 'pending', message: 'Requesting signature via MetaMask...' });
+    setTxStatus({ type: 'pending', message: 'Verifying network & requesting signature...' });
     
     try {
-      console.log(`[Ethers] Sending ${amt} ETH from ${userAddress} to ${targetAddress}...`);
+      console.log(`[Ethers] Fueling Process Initialized:`);
+      console.log(` - From: ${userAddress}`);
+      console.log(` - To:   ${targetAddress}`);
+      
       const txHash = await walletMgr.sendTransaction(targetAddress, amt);
       
       const explorerBase = chainConfig?.block_explorer_urls?.[0];
