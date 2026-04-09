@@ -209,11 +209,11 @@ class TEEAuthenticator:
 
   def get_private_key(self) -> str:
       """
-      Get the private key (for development/testing only).
-
-      Returns:
-          Private key as hex string
+      Get the private key (STRICTLY for dev debugging - never call in production).
       """
-      if not os.getenv("DEBUG", "false").lower() == "true":
-          raise PermissionError("Private key access disabled in production")
+      # Multi-layer safety check
+      if os.getenv("STRICT_DEV_MODE", "false").lower() != "true":
+          raise PermissionError("Access to TEE-derived private key is Forbidden outside STRICT_DEV_MODE")
+          
+      print("[CRITICAL WARNING] Private key exported. This agent is no longer securely isolated.")
       return self.private_key

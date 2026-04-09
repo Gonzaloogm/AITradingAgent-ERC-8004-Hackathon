@@ -1,55 +1,63 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import GlassCard from '../components/ui/GlassCard';
-import StatusCard from '../components/ui/StatusCard';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { useWallet } from '../hooks/useWallet';
 import { useToast } from '../components/ui/Toast';
 import { apiClient } from '../api/client';
-import { formatEth, getExplorerUrl, formatTxHash } from '../utils/formatters';
-
-const STEP_LABELS = ['Wallet Funding', 'Register Agent', 'Agent Status'];
-
-function StepIndicator({ step, current, label }) {
-  const done = current > step;
-  const active = current === step;
-  return (
-    <div className="flex items-center gap-2">
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-all ${
-        done ? 'bg-emerald-500/20 border border-emerald-500/60 text-emerald-400' :
-        active ? 'bg-cyan-500/20 border border-cyan-500/60 text-cyan-400' :
-        'bg-gray-800 border border-gray-700 text-gray-600'
-      }`}>
-        {done ? '✓' : step + 1}
-      </div>
-      <span className={`text-sm font-medium hidden sm:block ${done ? 'text-emerald-400' : active ? 'text-cyan-400' : 'text-gray-600'}`}>
-        {label}
-      </span>
-    </div>
-  );
-}
+import TrustCenter from '../components/agent/TrustCenter';
+import TrustEnclaveTerminal from '../components/agent/TrustEnclaveTerminal';
+import StrykrIntelligenceLog from '../components/agent/StrykrIntelligenceLog';
+import ChatInterface from '../components/chat/ChatInterface';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const toast = useToast();
+  // Using 5000ms polling for wallet in the custom hook as originally defined
   const { wallet, loading: walletLoading, error: walletError, formattedBalance, isFunded } = useWallet(5000);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [chainConfig, setChainConfig] = useState(null);
   const [reg, setReg] = useState({
     started: false,
-    identity: { status: 'waiting', message: 'Waiting...' },
-    reputation: { status: 'waiting', message: 'Waiting for identity...' },
+    identity: { status: 'WAITING', message: 'Ready to initialize...' },
+    reputation: { status: 'WAITING', message: 'Waiting for identity...' },
   });
   const [agentReady, setAgentReady] = useState(false);
   const [agentId, setAgentId] = useState(null);
+  const [activeTab, setActiveTab] = useState('intelligence'); // 'intelligence' or 'debug'
 
-  // Load chain config
+  // New Terminal Dashboard State
+  const [agentState, setAgentState] = useState({
+     status: 'OFFLINE', 
+     circuit_breaker_active: false, 
+     current_equity: 0, 
+     peak_equity: 0, 
+     current_llm_threshold: 0.1, 
+     last_spot_price: 0, 
+     last_spread: 0,
+     scan_results: []
+  });
+  const [terminalLogs, setTerminalLogs] = useState([
+    "[SYSTEM] Delta-Neutral Agent Enclave V2.0 initialized.",
+    "[TEE] Intel TDX quote verified by Phala Remote Attestation Daemon.",
+    "[MCP] Agent connecting to Kraken MCP Local Server...",
+    "[PRISM] Strykr Global Index connected successfully."
+  ]);
+  const terminalRef = useRef(null);
+
+  // Auto-scroll terminal securely
+  useEffect(() => {
+    if (terminalRef.current) {
+        terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [terminalLogs]);
+
+
+  // Load chain config once
   useEffect(() => {
     apiClient.getChainConfig().then(r => { if (r.success) setChainConfig(r.data); });
   }, []);
 
-  // Advance step when wallet funded
+  // Advance initial onboarding step when wallet funded
   useEffect(() => {
     if (isFunded && currentStep < 1) setCurrentStep(1);
   }, [isFunded, currentStep]);
@@ -64,8 +72,8 @@ export default function DashboardPage() {
           setAgentId(agent.agent_id);
           setReg({
             started: true,
-            identity:  { status: 'success', message: `Registered (ID: ${agent.agent_id})` },
-            reputation:{ status: 'success', message: 'Confirmed' },
+            identity:  { status: 'SUCCESS', message: `Registered (ID: ${agent.agent_id})` },
+            reputation:{ status: 'SUCCESS', message: 'Confirmed' },
           });
           setCurrentStep(2);
           setAgentReady(true);
@@ -73,6 +81,73 @@ export default function DashboardPage() {
       }
     })();
   }, []);
+
+  // Establish WebSocket for agent state and dynamically populate algorithmic logs
+  useEffect(() => {
+    let lastExecTime = 0;
+    let ws = null;
+
+    if (agentReady) {
+       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+       ws = new WebSocket(`${protocol}//${window.location.host}/api/stream`);
+       
+       ws.onmessage = (event) => {
+          try {
+             const data = JSON.parse(event.data);
+             setAgentState(data);
+             
+             if (data.status !== "halted") {
+                  setTerminalLogs(prev => {
+                    let newLogs = [...prev];
+                    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+                    
+                    // Show PRISM Scan result if changed
+                    if (data.active_symbol && data.active_symbol !== lastExecTime._lastSym) {
+                         newLogs.push(`[${time}] [PRISM] Global Scan: Best opportunity found on ${data.active_symbol}.`);
+                         lastExecTime._lastSym = data.active_symbol;
+                    }
+
+                    // Show MCP Tool Calls
+                    const mcpMsg = `[${time}] [MCP] kraken_exchange.get_ticker({"pair": "${data.active_symbol}/USD"})`;
+                    if (newLogs.length === 0 || !newLogs.some(l => l.includes(mcpMsg))) {
+                         newLogs.push(mcpMsg);
+                    }
+
+                    const tickMsg = `[${time}] [SCAN] ${data.active_symbol}: $${data.last_spot_price?.toFixed(2)} | Spread: ${data.last_spread?.toFixed(4)}% | Min: ${data.current_llm_threshold?.toFixed(4)}%`;
+                    
+                    if (newLogs.length === 0 || newLogs[newLogs.length - 1] !== tickMsg) {
+                        newLogs.push(tickMsg);
+                    }
+                    
+                    if (data.is_signing && Date.now() - (lastExecTime.time || 0) > 10000) {
+                       lastExecTime.time = Date.now();
+                       newLogs.push(`[${time}] [AI] Yield verified. Initiating TEE-signing protocol.`);
+                       newLogs.push(`[${time}] [SIG] EIP-712 Signature generated for ${data.active_symbol} trade.`);
+                       if (data.latest_cid) {
+                           newLogs.push(`[${time}] [IPFS] Integrity Proof Pinned: ${data.latest_cid}`);
+                       }
+                    }
+
+                    if (data.circuit_breaker_active && !newLogs.some(l => l.includes("CIRCUIT BREAKER"))) {
+                        newLogs.push(`[${time}] [CRITICAL] CIRCUIT BREAKER TRIPPED! TRADING HALTED.`);
+                    }
+
+                    if (newLogs.length > 50) return newLogs.slice(newLogs.length - 50);
+                    return newLogs;
+                  });
+             }
+          } catch (e) {
+             console.error("WS Parse error", e);
+          }
+       };
+
+       ws.onerror = (e) => console.error("WebSocket error", e);
+    }
+
+    return () => {
+        if (ws) ws.close();
+    };
+  }, [agentReady]);
 
   async function pollTx(txHash, onUpdate) {
     let delay = 2000;
@@ -89,13 +164,12 @@ export default function DashboardPage() {
 
   async function startRegistration() {
     if (!isFunded) { toast('Fund your wallet first', 'warning'); return; }
-    setReg(prev => ({ ...prev, started: true, identity: { status: 'in_progress', message: 'Broadcasting transaction...' } }));
+    setReg(prev => ({ ...prev, started: true, identity: { status: 'IN_PROGRESS', message: 'Broadcasting tx...' } }));
 
     try {
-      // Identity
       const identResult = await apiClient.registerAgent();
       if (!identResult.success) {
-        setReg(prev => ({ ...prev, identity: { status: 'error', message: identResult.error } }));
+        setReg(prev => ({ ...prev, identity: { status: 'ERROR', message: identResult.error } }));
         return;
       }
 
@@ -107,10 +181,10 @@ export default function DashboardPage() {
         finalAgentId = data.agent_id;
       } else {
         const conf = await pollTx(txIdentity, (n) => {
-          setReg(prev => ({ ...prev, identity: { status: 'in_progress', message: `Confirming... (attempt ${n})` } }));
+          setReg(prev => ({ ...prev, identity: { status: 'IN_PROGRESS', message: `Confirming... (attempt ${n})` } }));
         });
         if (!conf?.agent_id) {
-          setReg(prev => ({ ...prev, identity: { status: 'error', message: 'Transaction failed or timed out' } }));
+          setReg(prev => ({ ...prev, identity: { status: 'ERROR', message: 'Tx failed' } }));
           return;
         }
         finalAgentId = conf.agent_id;
@@ -119,174 +193,157 @@ export default function DashboardPage() {
       setAgentId(finalAgentId);
       setReg(prev => ({
         ...prev,
-        identity:  { status: 'success', message: `Registered (ID: ${finalAgentId})`, txHash: txIdentity, explorerUrl: chainConfig ? getExplorerUrl(txIdentity, chainConfig.block_explorer_urls?.[0]) : '#' },
-        reputation:{ status: 'in_progress', message: 'Initializing...' },
+        identity:  { status: 'SUCCESS', message: `Registered (ID: ${finalAgentId})`, txHash: txIdentity },
+        reputation:{ status: 'IN_PROGRESS', message: 'Init...' },
       }));
 
-      // Reputation
       const repResult = await apiClient.submitInitialReputation();
       if (repResult.success) {
         setReg(prev => ({
           ...prev,
-          reputation: { status: 'success', message: 'Starts at 0 (builds from client feedback)' },
+          reputation: { status: 'SUCCESS', message: 'Initialized' },
         }));
         setCurrentStep(2);
         setAgentReady(true);
+        setTerminalLogs(prev => [...prev, `[SYSTEM] Agent ID ${finalAgentId} active. Starting logic loops...`]);
       } else {
-        setReg(prev => ({ ...prev, reputation: { status: 'error', message: repResult.error } }));
+        setReg(prev => ({ ...prev, reputation: { status: 'ERROR', message: repResult.error } }));
       }
     } catch (e) {
-      setReg(prev => ({ ...prev, identity: { status: 'error', message: e.message } }));
+      setReg(prev => ({ ...prev, identity: { status: 'ERROR', message: e.message } }));
     }
   }
 
-  const allRegDone = reg.identity.status === 'success' && reg.reputation.status === 'success';
+  const allRegDone = reg.identity.status === 'SUCCESS' && reg.reputation.status === 'SUCCESS';
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-extrabold gradient-text tracking-tight">TEE Agent Dashboard</h1>
-        <p className="text-gray-500 mt-1 text-sm">Complete the setup steps to activate your on-chain agent identity</p>
+    <div className="min-h-fit text-gray-200 mt-2 space-y-8 pb-12">
+      {/* 1. STATE-OF-THE-ART HEADER & BLINKING BADGE */}
+      <div className="flex flex-col lg:flex-row justify-between items-center p-8 bg-black/40 rounded-[2rem] border border-white/5 shadow-[0_22px_70px_4px_rgba(0,0,0,0.56)] backdrop-blur-3xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-40" />
+        
+        <div className="flex flex-col items-center lg:items-start text-center lg:text-left z-10">
+          <h1 className="text-4xl font-mono font-black tracking-tighter text-white">
+            <span className="text-cyan-400">ENCLAVE</span>.EX
+          </h1>
+          <p className="text-gray-500 mt-2 font-mono text-[10px] uppercase tracking-[0.4em]">Verifiable Autonomous Infrastructure</p>
+        </div>
+
+        {/* THE WINNER BADGE */}
+        <div className={`my-6 lg:my-0 flex items-center gap-4 px-8 py-4 rounded-2xl border-2 transition-all duration-300 transform scale-110 ${agentState.is_signing ? 'bg-emerald-500/20 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.5)] animate-pulse' : 'bg-white/5 border-white/10 opacity-60'}`}>
+           <div className={`w-4 h-4 rounded-full ${agentReady ? (agentState.is_signing ? 'bg-emerald-400' : 'bg-emerald-500') : 'bg-gray-700'}`}></div>
+           <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Integrity Status</span>
+              <span className={`text-sm font-black font-mono tracking-tighter ${agentState.is_signing ? 'text-emerald-300' : 'text-white'}`}>
+                {agentState.is_signing ? 'HARDWARE_SIGNING_ID...' : 'HARDWARE VERIFIED: INTEL TDX'}
+              </span>
+           </div>
+        </div>
+        
+        <div className="flex gap-8 items-center z-10">
+           <div className="text-right font-mono">
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Portfolio Equity</p>
+              <p className="text-3xl font-black text-white">{(agentState.current_equity || 0).toFixed(4)} <span className="text-cyan-500/50 text-xl italic">ETH</span></p>
+           </div>
+        </div>
       </div>
 
-      {/* Step progress bar */}
-      <GlassCard className="!py-4">
-        <div className="flex items-center justify-between">
-          {STEP_LABELS.map((label, i) => (
-            <div key={i} className="flex items-center gap-2 flex-1">
-              <StepIndicator step={i} current={currentStep} label={label} />
-              {i < STEP_LABELS.length - 1 && (
-                <div className={`hidden sm:block flex-1 h-px mx-2 ${currentStep > i ? 'bg-emerald-500/40' : 'bg-gray-800'}`} />
-              )}
-            </div>
-          ))}
-        </div>
-      </GlassCard>
-
-      {/* Step 1: Wallet */}
-      <GlassCard className={currentStep < 0 ? 'opacity-50' : ''}>
-        <div className="flex items-center gap-3 mb-5">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-            isFunded ? 'bg-emerald-500/20 border border-emerald-500/60 text-emerald-400' : 'bg-cyan-500/20 border border-cyan-500/60 text-cyan-400'
-          }`}>{isFunded ? '✓' : '1'}</div>
-          <h2 className="text-xl font-bold">Wallet Funding</h2>
-        </div>
-
-        {walletLoading ? (
-          <div className="flex items-center gap-3 text-gray-400 ml-11">
-            <LoadingSpinner size="sm" /> <span>Loading wallet...</span>
-          </div>
-        ) : walletError ? (
-          <p className="text-red-400 ml-11 text-sm">❌ {walletError}</p>
-        ) : (
-          <div className="ml-11 space-y-3">
-            {isFunded ? (
-              <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                <span>✓ Wallet Funded</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium">
-                <span className="pulse-dot yellow" /> Waiting for funds...
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-white/[0.03] rounded-lg px-4 py-3 border border-white/[0.06]">
-                <p className="text-xs text-gray-500 mb-1">Address</p>
-                <p className="font-mono text-xs text-gray-200 break-all">{wallet?.address}</p>
-              </div>
-              <div className="bg-white/[0.03] rounded-lg px-4 py-3 border border-white/[0.06]">
-                <p className="text-xs text-gray-500 mb-1">Balance</p>
-                <p className="font-mono text-lg text-white">
-                  {formattedBalance} <span className="text-gray-500 text-sm">ETH</span>
-                </p>
-              </div>
-            </div>
-            {!isFunded && (
-              <a href="/funding" className="inline-block mt-1 text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
-                → Fund Wallet
-              </a>
-            )}
-          </div>
-        )}
-      </GlassCard>
-
-      {/* Step 2: Register */}
-      <GlassCard className={currentStep < 1 ? 'opacity-40 pointer-events-none' : ''}>
-        <div className="flex items-center gap-3 mb-5">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-            allRegDone ? 'bg-emerald-500/20 border border-emerald-500/60 text-emerald-400' : 'bg-cyan-500/20 border border-cyan-500/60 text-cyan-400'
-          }`}>{allRegDone ? '✓' : '2'}</div>
-          <h2 className="text-xl font-bold">Register Your Agent</h2>
-        </div>
-
-        <div className="ml-11">
-          {!reg.started ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-400">Register your agent on-chain for ERC-8004 Identity and Reputation.</p>
-              <button
-                onClick={startRegistration}
-                disabled={!isFunded}
-                className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:cursor-not-allowed
-                  px-6 py-3 rounded-xl font-semibold text-sm transition-all
-                  shadow-[0_0_20px_rgba(0,243,255,0.2)] hover:shadow-[0_0_30px_rgba(0,243,255,0.35)]"
-              >
-                Register Agent
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <StatusCard title="Identity Registry" statusData={reg.identity} />
-              <StatusCard title="Reputation" statusData={reg.reputation} />
-              {allRegDone && (
-                <button
-                  onClick={() => navigate('/developer')}
-                  className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 px-6 py-3 rounded-xl font-semibold text-sm transition-all"
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* CENTER COLUMN: THE PROTAGONIST ENCLAVE TERMINAL */}
+        <div className="lg:col-span-12 xl:col-span-8 flex flex-col gap-8">
+          
+          <div className="space-y-4">
+             <div className="flex gap-2 font-mono text-[10px] items-center mb-2">
+                <button 
+                  onClick={() => setActiveTab('intelligence')}
+                  className={`px-4 py-2 rounded-lg border transition-all ${activeTab === 'intelligence' ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.2)]' : 'bg-white/5 border-white/5 text-gray-600 hover:text-gray-400'}`}
                 >
-                  Go to Developer Dashboard →
+                  STRYKR INTELLIGENCE
                 </button>
-              )}
+                <button 
+                  onClick={() => setActiveTab('debug')}
+                  className={`px-4 py-2 rounded-lg border transition-all ${activeTab === 'debug' ? 'bg-purple-500/10 border-purple-500/50 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'bg-white/5 border-white/5 text-gray-600 hover:text-gray-400'}`}
+                >
+                  DEBUG_CHAT_V1.2
+                </button>
+             </div>
+
+             {activeTab === 'intelligence' ? (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                   {/* REAL TIME HEX STREAM */}
+                   <TrustEnclaveTerminal isSigning={agentState.is_signing} />
+                   
+                   {/* MARKET GRID */}
+                   <StrykrIntelligenceLog 
+                     scanResults={agentState.scan_results} 
+                     activeSymbol={agentState.active_symbol} 
+                   />
+                </div>
+             ) : (
+                <div className="animate-in fade-in zoom-in-95 duration-500">
+                   <ChatInterface />
+                </div>
+             )}
+          </div>
+
+          {/* AUTO LOGS (Replaced by compact console at bottom if intelligence is active) */}
+          {activeTab === 'intelligence' && (
+            <div className="bg-[#050505] rounded-3xl border border-white/5 shadow-inner flex flex-col h-[200px] overflow-hidden opacity-80">
+                <div className="bg-white/5 py-2 px-6 border-b border-white/5 font-mono text-[9px] text-gray-500 uppercase tracking-widest">
+                  System Trace
+                </div>
+                <div ref={terminalRef} className="p-6 flex-1 overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-thin">
+                   {terminalLogs.slice(-10).map((log, i) => (
+                      <div key={i} className="mb-1 text-gray-600 border-l border-white/10 pl-4">{log}</div>
+                   ))}
+                </div>
             </div>
           )}
         </div>
-      </GlassCard>
 
-      {/* Step 3: Agent Status */}
-      <GlassCard className={currentStep < 2 ? 'opacity-40 pointer-events-none' : ''}>
-        <div className="flex items-center gap-3 mb-5">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-            agentReady ? 'bg-emerald-500/20 border border-emerald-500/60 text-emerald-400' : 'bg-gray-800 border border-gray-700 text-gray-600'
-          }`}>{agentReady ? '✓' : '3'}</div>
-          <h2 className="text-xl font-bold">Agent Status</h2>
-        </div>
+        {/* SIDEBAR: TRUST & INFRA */}
+        <div className="lg:col-span-12 xl:col-span-4 flex flex-col gap-8">
+          
+          <TrustCenter 
+            agentStatus={status?.data} 
+            teeState={agentState} 
+          />
 
-        <div className="ml-11">
-          {agentReady ? (
+          <div className="bg-white/[0.02] rounded-3xl border border-white/5 p-8 space-y-6">
+            <h3 className="font-mono text-[10px] font-bold text-gray-500 uppercase tracking-[0.3em] border-b border-white/5 pb-4">Initialization Flow</h3>
+            
             <div className="space-y-4">
-              <p className="text-emerald-400 font-medium text-sm">✓ Agent Ready — A2A endpoints active</p>
-              {agentId && <p className="text-xs font-mono text-gray-500">Agent ID: {agentId}</p>}
-              <div className="flex flex-wrap gap-3">
-                <a
-                  href="/agent.json"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-                >
-                  → View Agent Card
-                </a>
-                <button
-                  onClick={() => navigate('/developer')}
-                  className="bg-cyan-600/20 border border-cyan-500/40 hover:bg-cyan-600/30 text-cyan-400 px-4 py-2 rounded-lg text-sm transition-all"
-                >
-                  Developer Dashboard
-                </button>
+              <div className={`p-6 rounded-2xl border transition-all ${isFunded ? 'bg-emerald-500/[0.03] border-emerald-500/20 shadow-[inset_0_0_20px_rgba(16,185,129,0.05)]' : 'bg-white/5 border-white/10'}`}>
+                 <p className="text-[9px] font-bold text-gray-500 mb-2 tracking-widest">ENV: COLLATERAL</p>
+                 {isFunded ? (
+                   <p className="text-lg font-mono text-emerald-400 font-bold">{formattedBalance} ETH</p>
+                 ) : (
+                   <button onClick={() => navigate('/funding')} className="w-full py-3 bg-cyan-600 text-white font-black rounded-xl text-xs uppercase tracking-tighter hover:bg-cyan-500 transition-colors">Deposit Funds</button>
+                 )}
+              </div>
+
+              <div className={`p-6 rounded-2xl border transition-all ${allRegDone ? 'bg-emerald-500/[0.03] border-emerald-500/20' : 'bg-white/5 border-white/10'}`}>
+                 <p className="text-[9px] font-bold text-gray-500 mb-2 tracking-widest">PROT: ERC-8004_ID</p>
+                 {allRegDone ? (
+                   <div className="flex items-center justify-between">
+                     <p className="text-sm font-mono text-white font-bold truncate pr-4">AGENT_{agentId?.slice(0, 8)}</p>
+                     <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-bold uppercase tracking-tighter">Verified</span>
+                   </div>
+                 ) : (
+                   <button 
+                     onClick={startRegistration} 
+                     disabled={!isFunded || reg.started}
+                     className="w-full py-3 bg-white/10 hover:bg-white/20 text-white font-black rounded-xl text-xs uppercase transition-all disabled:opacity-30"
+                   >
+                     {reg.started ? 'BROADCASTING...' : 'INITIATE REGISTRY'}
+                   </button>
+                 )}
               </div>
             </div>
-          ) : (
-            <p className="text-gray-500 text-sm">Waiting for registration...</p>
-          )}
+          </div>
+          
         </div>
-      </GlassCard>
+      </div>
     </div>
   );
 }

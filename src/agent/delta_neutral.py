@@ -19,6 +19,7 @@ load_dotenv(os.path.join(_project_root, '.env'))
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from tee_auth import TEEAuthenticator
+from data_provider import MarketScanner
 
 class DeltaNeutralEngine:
     def __init__(self):
@@ -27,6 +28,26 @@ class DeltaNeutralEngine:
         self.last_price = None                # Tracks the previous spot price for swing detection
         self.last_llm_threshold: Optional[float] = None # Tracks the most recent AI risk limit
         self.short_term_memory: list = []     # Rolling 5-entry log of recent tick decisions
+
+        # ------------------------------------------------------------------
+        # REAL-TIME METRICS CACHE (For Dashboard WebSocket Streaming)
+        # ------------------------------------------------------------------
+        self.active_symbol = "BTC"            # Dynamic: updated by PRISM scan
+        self._last_spot = 0.0
+        self._last_perp = 0.0
+        self._last_spread_pct = 0.0
+        self._last_net_yield_pct = 0.0
+        self._last_funding_rate = 0.0
+        self._last_cid = None
+        self._last_scan_results = []
+        self._is_signing = False
+        
+        # ------------------------------------------------------------------
+        # STRYKR PRISM & DATA PROVIDER
+        # ------------------------------------------------------------------
+        self.scanner = MarketScanner(
+            api_key=os.getenv("PRISM_API_KEY")
+        )
 
         # ------------------------------------------------------------------
         # PORTFOLIO HEALTH / DRAWDOWN CONTROL
@@ -248,6 +269,8 @@ class DeltaNeutralEngine:
     # ------------------------------------------------------------------
     LLM_DEFAULT_THRESHOLD = 0.10  # % fallback if LLM is unavailable
 
+    # Market data fetching is now consolidated in self.scanner (data_provider.py)
+
     async def analyze_market_context_with_llm(
         self, spot_price: float, perp_price: float,
         funding_rate: float, recent_volatility: float
@@ -288,111 +311,64 @@ Respond ONLY with a valid JSON object, no extra text:
 {{"required_spread_threshold": <float>}}
 """
 
-        try:
-            print("[INFO] Querying LLM for dynamic spread threshold...")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                print(f"[INFO] Querying LLM for dynamic spread threshold (Attempt {attempt + 1}/{max_retries})...")
 
-            # Build a concise text representation of recent decisions for the system prompt
-            memory_block = (
-                "\n".join(f"  - {m}" for m in self.short_term_memory)
-                if self.short_term_memory
-                else "  (no prior decisions recorded yet)"
-            )
-            system_prompt = (
-                "You are a precise quantitative risk manager. "
-                "You only respond with valid JSON.\n\n"
-                "Recent agent memory (last 5 ticks):\n"
-                f"{memory_block}\n\n"
-                "Adaptive threshold guidance:\n"
-                "- If recent memory shows mostly SKIP entries with a high threshold, "
-                "consider lowering the threshold slightly if current volatility allows.\n"
-                "- If recent memory shows an EXECUTE entry, raise the threshold to "
-                "avoid over-trading and protect capital."
-            )
+                # Build a concise text representation of recent decisions for the system prompt
+                memory_block = (
+                    "\n".join(f"  - {m}" for m in self.short_term_memory)
+                    if self.short_term_memory
+                    else "  (no prior decisions recorded yet)"
+                )
+                system_prompt = (
+                    "You are a precise quantitative risk manager. "
+                    "You only respond with valid JSON.\n\n"
+                    "Recent agent memory (last 5 ticks):\n"
+                    f"{memory_block}\n\n"
+                    "Adaptive threshold guidance:\n"
+                    "- If recent memory shows mostly SKIP entries with a high threshold, "
+                    "consider lowering the threshold slightly if current volatility allows.\n"
+                    "- If recent memory shows an EXECUTE entry, raise the threshold to "
+                    "avoid over-trading and protect capital."
+                )
 
-            response = await self.llm_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
-                max_tokens=64,
-            )
-            raw = response.choices[0].message.content.strip()
-            # Strip markdown fences if present
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            data = json.loads(raw)
-            threshold = float(data["required_spread_threshold"])
-            # Clamp to allowed range
-            threshold = max(0.015, min(threshold, 0.20))
-            self.last_llm_threshold = threshold # Store for API access
-            print(f"[INFO] LLM threshold received: {threshold:.4f}% "
-                  f"(current spread: {spread_pct:.4f}%)")
-            return threshold
+                response = await self.llm_client.chat.completions.create(
+                    model=self.llm_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.2,
+                    max_tokens=64,
+                    timeout=10
+                )
+                raw = response.choices[0].message.content.strip()
+                # Strip markdown fences if present
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+                data = json.loads(raw)
+                threshold = float(data["required_spread_threshold"])
+                # Clamp to allowed range
+                threshold = max(0.015, min(threshold, 0.20))
+                self.last_llm_threshold = threshold # Store for API access
+                print(f"[INFO] LLM threshold received: {threshold:.4f}% "
+                      f"(current spread: {spread_pct:.4f}%)")
+                return threshold
 
-        except Exception as e:
-            print(f"[WARN] LLM unavailable ({e}). "
-                  f"Using default threshold: {self.LLM_DEFAULT_THRESHOLD}%")
-            self.last_llm_threshold = self.LLM_DEFAULT_THRESHOLD
-            return self.LLM_DEFAULT_THRESHOLD
+            except Exception as e:
+                print(f"[WARN] LLM call failed formatting or timed out ({e}).")
+                if attempt < max_retries - 1:
+                    backoff = 2 ** attempt
+                    print(f"[INFO] Retrying LLM in {backoff} seconds...")
+                    await asyncio.sleep(backoff)
+
+        print(f"[WARN] LLM completely failed after {max_retries} attempts. Using default threshold: {self.LLM_DEFAULT_THRESHOLD}%")
+        self.last_llm_threshold = self.LLM_DEFAULT_THRESHOLD
+        return self.LLM_DEFAULT_THRESHOLD
             
-    def get_market_prices(self):
-        """Fetch market data using Kraken CLI with Binance API as fallback."""
-        # 1. Attempt Kraken CLI (Hackathon Track)
-        try:
-            # Kraken CLI is optimized for AI agents; using -o json guarantees machine-readable NDJSON
-            cmd = f"kraken ticker {self.symbol_market} -o json 2>/dev/null"
-            print(f"[INFO] Fetching market data via Kraken CLI ({cmd})...")
-            
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            
-            # Verify the command succeeded (exit code 0)
-            if result.returncode == 0:
-                try:
-                    # Parse stdout; handles NDJSON or standard JSON objects
-                    data = json.loads(result.stdout.strip())
-                    
-                    # Extract requested fields: spot_price and perp_price
-                    spot_price   = float(data.get("spot_price", data.get("spot", data.get("price"))))
-                    perp_price   = float(data.get("perp_price", data.get("perp", data.get("perp_price"))))
-                    funding_rate = float(data.get("funding_rate", 0.0))
-
-                    print(f"[OK] Market data successfully parsed from Kraken CLI.")
-                    return spot_price, perp_price, funding_rate
-                except json.JSONDecodeError as jde:
-                    print(f"[ERROR] Failed to parse Kraken CLI JSON: {jde}")
-                    print(f"[DEBUG] Raw output: {result.stdout}")
-            else:
-                print(f"[WARN] Kraken CLI returned non-zero exit code: {result.returncode}")
-
-        except Exception as e:
-            # Fallback gracefully if kraken is not installed or other system error occurs
-            reason = type(e).__name__
-            print(f"[WARN] Kraken CLI attempt failed ({reason}). Falling back to Binance API...")
-
-        # 2. Fallback to Binance API
-        try:
-            spot_url = f"https://api.binance.com/api/v3/ticker/price?symbol={self.symbol_api}"
-            spot_price = float(requests.get(spot_url).json()["price"])
-
-            perp_url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={self.symbol_api}"
-            perp_price = float(requests.get(perp_url).json()["price"])
-
-            funding_url = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={self.symbol_api}"
-            funding_data = requests.get(funding_url).json()
-            last_funding_rate = float(funding_data["lastFundingRate"])
-
-            return spot_price, perp_price, last_funding_rate
-        except Exception as e:
-            print(f"[WARN] Binance API connection error: {e}. Using hardcoded fallback data.")
-            return 50000.00, 50030.00, 0.0001
+    # Analysis logic consolidated here for Delta Neutral engine
 
     def analyze_spread(self, spot, perp, funding_rate, llm_threshold: float):
         """Evaluate market conditions and execute a trade if both the
@@ -410,14 +386,22 @@ Respond ONLY with a valid JSON object, no extra text:
         net_yield_pct = spread_pct + funding_rate_pct - EXCHANGE_FEE_PCT
 
         print("-" * 60)
-        print(f"[INFO] {self.symbol_market.split('/')[0]} Spot:              ${spot:,.2f}")
-        print(f"[INFO] {self.symbol_market.split('/')[0]} Perp:              ${perp:,.2f}")
+        print(f"[INFO] {self.active_symbol} Spot:              ${spot:,.2f}")
+        print(f"[INFO] {self.active_symbol} Perp:              ${perp:,.2f}")
         print(f"[INFO] Spread (premium):      {spread_pct:.4f}%")
         print(f"[INFO] Funding Rate:          {funding_rate_pct:.4f}% (per 8h)")
         print(f"[INFO] Estimated fees:       -{EXCHANGE_FEE_PCT:.2f}% (2 legs x 0.05%)")
         print(f"[INFO] Net Yield:             {net_yield_pct:.4f}%")
         print(f"[INFO] LLM Spread Threshold: {llm_threshold:.4f}% (minimum required)")
         print("-" * 60)
+
+        # Cache market metrics unconditionally for real-time frontend WebSocket streaming
+        self._last_spot          = spot
+        self._last_perp          = perp
+        self._last_funding_rate  = funding_rate
+        self._last_net_yield_pct = net_yield_pct
+        self._last_llm_threshold = llm_threshold
+        self._last_spread_pct    = spread_pct
 
         # Gate 1: spread must meet or exceed the LLM-determined minimum threshold
         spread_ok = spread_pct >= llm_threshold
@@ -431,28 +415,26 @@ Respond ONLY with a valid JSON object, no extra text:
 
         if spread_ok and yield_ok:
             print("[OK] Cash-and-Carry opportunity confirmed by LLM. Executing trade.")
+            self._is_signing = True
+            try:
+                # --- Dynamic position sizing (fractional risk) ---
+                available_eth    = self.get_available_capital()
+                trade_size_eth   = available_eth * self.RISK_FRACTION
+                trade_amount_wei = int(Web3.to_wei(trade_size_eth, "ether"))
 
-            # Cache market metrics for the validation artifact
-            self._last_spot          = spot
-            self._last_perp          = perp
-            self._last_funding_rate  = funding_rate
-            self._last_net_yield_pct = net_yield_pct
-            self._last_llm_threshold = llm_threshold
-            self._last_spread_pct    = spread_pct
+                print(f"[INFO] Available capital  : {available_eth:.6f} ETH")
+                print(f"[INFO] Position size ({int(self.RISK_FRACTION*100)}%): "
+                      f"{trade_size_eth:.6f} ETH  ->  {trade_amount_wei} Wei (uint256)")
 
-            # --- Dynamic position sizing (fractional risk) ---
-            available_eth    = self.get_available_capital()
-            trade_size_eth   = available_eth * self.RISK_FRACTION
-            trade_amount_wei = int(Web3.to_wei(trade_size_eth, "ether"))
-
-            print(f"[INFO] Available capital  : {available_eth:.6f} ETH")
-            print(f"[INFO] Position size ({int(self.RISK_FRACTION*100)}%): "
-                  f"{trade_size_eth:.6f} ETH  ->  {trade_amount_wei} Wei (uint256)")
-
-            self.create_trade_intent("LONG_SPOT_SHORT_PERP", self.symbol_market, trade_amount_wei)
-            self.is_running = False
+                self.create_trade_intent("LONG_SPOT_SHORT_PERP", self.active_symbol, trade_amount_wei)
+                self.is_running = False
+            finally:
+                # Schedule flag reset
+                import asyncio
+                asyncio.create_task(self._clear_signing_flag(3))
         else:
             print("[INFO] Conditions not met. Waiting for better opportunity...")
+            self._is_signing = False
 
         # --- Short-term memory: record this tick's outcome (rolling 5-entry window) ---
         tick_time = time.strftime("%H:%M:%S", time.localtime())
@@ -466,6 +448,11 @@ Respond ONLY with a valid JSON object, no extra text:
             self.short_term_memory.pop(0)  # Evict oldest entry
         print(f"[MEM] {memory_entry}")
 
+    async def _clear_signing_flag(self, delay: int):
+        import asyncio
+        await asyncio.sleep(delay)
+        self._is_signing = False
+
     # ------------------------------------------------------------------
     # ERC-8004 VALIDATION ARTIFACT
     # ------------------------------------------------------------------
@@ -474,7 +461,7 @@ Respond ONLY with a valid JSON object, no extra text:
 
     def generate_validation_artifact(self, trade_intent_data: dict, signature: str) -> str:
         """Build an ERC-8004 compliant validation artifact, hash it with keccak,
-        and save it locally to simulate an IPFS/ValidationRegistry upload.
+        and upload it to IPFS via Pinata. Saves locally as a fallback.
 
         Args:
             trade_intent_data: The EIP-712 message_data dict from the signed trade.
@@ -497,14 +484,60 @@ Respond ONLY with a valid JSON object, no extra text:
         request_hash  = Web3.keccak(text=artifact_json).hex()
         short_hash    = request_hash[:10]
 
-        os.makedirs("src/agent/artifacts", exist_ok=True)
-        artifact_path = f"src/agent/artifacts/artifact_{short_hash}.json"
-        with open(artifact_path, "w", encoding="utf-8") as fh:
-            json.dump(artifact, fh, indent=2, sort_keys=True)
+        pinata_api_key = os.getenv("PINATA_API_KEY")
+        pinata_secret_api_key = os.getenv("PINATA_SECRET_API_KEY")
+
+        upload_success = False
+        max_retries = 3
+        if pinata_api_key and pinata_secret_api_key:
+            for attempt in range(max_retries):
+                try:
+                    headers = {
+                        "pinata_api_key": pinata_api_key,
+                        "pinata_secret_api_key": pinata_secret_api_key,
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "pinataOptions": {"cidVersion": 1},
+                        "pinataMetadata": {"name": f"artifact_{short_hash}.json"},
+                        "pinataContent": artifact
+                    }
+                    response = requests.post(
+                        "https://api.pinata.cloud/pinning/pinJSONToIPFS",
+                        headers=headers,
+                        json=payload,
+                        timeout=10
+                    )
+                    if response.status_code == 200:
+                        cid = response.json().get("IpfsHash")
+                        self._last_cid = f"ipfs://{cid}"
+                        print(f"Artifact pinned to IPFS! CID: {self._last_cid}")
+                        upload_success = True
+                        break
+                    elif response.status_code == 429:
+                        print(f"[WARN] IPFS Pinata API Rate Limited! (Attempt {attempt+1}/{max_retries})")
+                        if attempt < max_retries - 1:
+                            time.sleep(2 ** attempt)
+                    else:
+                        print(f"[WARN] IPFS upload failed with status {response.status_code}: {response.text}")
+                        break
+                except Exception as e:
+                    print(f"[WARN] IPFS upload exception (Attempt {attempt+1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)
+        else:
+            print("[WARN] Pinata credentials not found, skipping IPFS upload.")
+
+        if not upload_success:
+            print("[INFO] Falling back to local artifact storage.")
+            os.makedirs("src/agent/artifacts", exist_ok=True)
+            artifact_path = f"src/agent/artifacts/artifact_{short_hash}.json"
+            with open(artifact_path, "w", encoding="utf-8") as fh:
+                json.dump(artifact, fh, indent=2, sort_keys=True)
+            print(f"[INFO] Artifact file : {artifact_path}")
 
         print("[OK] Validation Artifact generated and hashed for ERC-8004 Validation Registry.")
         print(f"[INFO] Request hash  : 0x{request_hash}")
-        print(f"[INFO] Artifact file : {artifact_path}")
 
         return request_hash
 
@@ -654,53 +687,66 @@ Respond ONLY with a valid JSON object, no extra text:
             print(f"[ERROR] Failed to submit transaction: {e}")
             print("-" * 50)
 
-    async def buy_external_signals_x402(self, target_agent_id: int) -> float:
-        """Simulate an Agent-to-Agent (A2A) economic interaction via the x402 protocol.
-        
-        Our agent pays another agent 0.05 USDC on Base to receive premium sentiment
-        data, which is then used to refine the risk threshold.
-        """
-        print(f"[INFO] Initiating x402 micropayment of 0.05 USDC to Agent ID {target_agent_id} "
-              "for premium market sentiment data...")
-        
-        # Simulate network delay for on-chain/p2p micro-settlement
-        await asyncio.sleep(2.0)
-        
-        # Mock sentiment multiplier: 1.05 (slightly higher threshold = more cautious)
-        sentiment_multiplier = 1.05
-        print(f"[OK] x402 payment confirmed. Received sentiment multiplier: {sentiment_multiplier}")
-        return sentiment_multiplier
+    # DELETED: buy_external_signals_x402 (Humo removed by Lead Developer)
 
     async def run_loop(self):
-        print("[INFO] Starting Delta-Neutral AI Agent (Cash-and-Carry) with live data...")
+        print("[INFO] Starting Global Delta-Neutral Engine (Strykr Intelligence Pack)")
         while self.is_running:
-            spot, perp, funding_rate = self.get_market_prices()
+            try:
+                # --- Step 1: Multi-Asset Market Scan ---
+                symbols = ["BTC", "ETH", "SOL"]
+                scan_results = await self.scanner.get_batch_spreads(symbols)
+                self._last_scan_results = scan_results
 
-            # --- Safety check: evaluate volatility before any trade logic ---
-            recent_volatility = (
-                abs((spot - self.last_price) / self.last_price) * 100
-                if self.last_price is not None else 0.0
-            )
-            self.check_circuit_breaker(spot, self.last_price)
-            self.last_price = spot  # Always update reference price
+                # Use BTC as the volatility benchmark for the circuit breaker
+                btc_data = next((r for r in scan_results if r["symbol"] == "BTC"), None)
+                if btc_data:
+                    self.check_circuit_breaker(btc_data["spot"], self.last_price)
+                    self.last_price = btc_data["spot"]
 
-            if self.circuit_breaker_tripped:
-                print("[CRITICAL] Circuit breaker is active -- skipping trade evaluation.")
-                print("   Restart the agent or set self.circuit_breaker_tripped = False to resume.")
-                self.is_running = False
-                break
+                if self.circuit_breaker_tripped:
+                    print("[HALT] Circuit breaker active. Standing by...")
+                    await asyncio.sleep(10)
+                    continue
 
-            llm_threshold = await self.analyze_market_context_with_llm(
-                spot, perp, funding_rate, recent_volatility
-            )
-            
-            # --- x402 A2A Interaction: Buy external sentiment signals ---
-            # We pay a peer agent for premium data to refine our final threshold
-            sentiment_multiplier = await self.buy_external_signals_x402(target_agent_id=42)
-            llm_threshold *= sentiment_multiplier
-            
-            self.analyze_spread(spot, perp, funding_rate, llm_threshold)
-            await asyncio.sleep(3)  # Non-blocking pause
+                # --- Step 2: Risk Analysis per Opportunity ---
+                # We analyze the candidate set to find the best spread
+                base_threshold = float(os.getenv("MIN_SPREAD_THRESHOLD", "0.08"))
+                
+                # --- Step 3: AI Risk Enrichment ---
+                # Use benchmark data for LLM context
+                llm_threshold = await self.analyze_market_context_with_llm(
+                    btc_data["spot"] if btc_data else 50000, 
+                    btc_data["perp"] if btc_data else 50040, 
+                    0.0001, # Funding simplified for batch scan
+                    0.0     # Volatility logic moved to circuit breaker
+                )
+                
+                final_threshold = max(base_threshold, llm_threshold)
+
+                # --- Step 4: Opportunity Selection (Winner Takes All) ---
+                winner = self.scanner.get_best_opportunity(scan_results, final_threshold)
+                
+                if winner:
+                    # Lead Developer Log Requirement: [PRISM Scan] Winner: {symbol}/USDC with {yield}% yield.
+                    print(f"[PRISM Scan] Winner: {winner['symbol']}/USDC with {winner['net_yield']}% yield.")
+                    
+                    self.active_symbol = winner["symbol"]
+                    self.analyze_spread(
+                        winner["spot"], 
+                        winner["perp"], 
+                        0.0001, # Standard funding fallback
+                        final_threshold
+                    )
+                else:
+                    print(f"[INFO] No assets met the minimum threshold ({final_threshold}%).")
+
+                # Professionalized loop delay
+                await asyncio.sleep(5)
+
+            except Exception as e:
+                print(f"[CRITICAL] Unhandled global exception in run_loop: {e}. Surviving...")
+                await asyncio.sleep(5)
 
 if __name__ == "__main__":
     engine = DeltaNeutralEngine()

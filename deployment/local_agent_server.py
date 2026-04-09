@@ -24,7 +24,7 @@ from typing import Dict, Any, Optional
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -141,9 +141,15 @@ async def prepare_tee_attestation():
           app_id = agent_domain.split(':')[0].split('.')[0]
           dstack_domain = os.getenv('DSTACK_GATEWAY_DOMAIN', 'local.dev')
 
-      # Step 3: Get offchain proof
+      # Step 3: Get offchain proof from the configured Phala Proxy
       import httpx
       from web3 import Web3
+
+      # Production Phala Proof Proxy URL (should be set in .env)
+      proof_proxy_url = os.getenv(
+          "PHALA_PROOF_PROXY_URL", 
+          "https://194622febfc33d67e4a98f365dbc2fe9d0d53933-3000.dstack-pha-prod9.phala.network/getOffchainProof"
+      )
 
       payload = {
           'agentId': agent.agent_id,
@@ -153,11 +159,11 @@ async def prepare_tee_attestation():
           'dstackDomain': dstack_domain,
       }
 
-      print(f" TEE Prep: Requesting offchain proof...")
+      print(f" TEE Prep: Requesting offchain proof from {proof_proxy_url}...")
 
       async with httpx.AsyncClient(timeout=60.0) as client:
           resp = await client.post(
-              'https://194622febfc33d67e4a98f365dbc2fe9d0d53933-3000.dstack-pha-prod9.phala.network/getOffchainProof',
+              proof_proxy_url,
               json=payload
           )
           resp.raise_for_status()
@@ -200,13 +206,25 @@ async def startup_event():
   print(f"\n Agent Domain: {domain}")
   print(f" Salt: {salt}")
 
-  # Initialize TEE authenticator
-  print("\n Initializing TEE authentication...")
+  # --- TEE AUTHENTICATION BOOTSTRAP ---
+  # Automatic detection: use TEE if available, otherwise check if mock is allowed
+  use_tee_detected = os.path.exists("/dev/tdx-guest") or os.path.exists("/var/run/dstack.sock")
+  allow_mock = os.getenv("ALLOW_TEE_MOCK", "true").lower() == "true"
+  
+  effective_use_tee = use_tee_detected
+  if not use_tee_detected and allow_mock:
+      print("[WARN] No TEE device found. Booting in MOCK mode (ALLOW_TEE_MOCK=true).")
+      effective_use_tee = False
+  elif not use_tee_detected and not allow_mock:
+      print("[CRITICAL] TEE required but not detected (ALLOW_TEE_MOCK=false). Aborting.")
+      sys.exit(1)
+
+  print(f"\n Initializing TEE identity (Mode: {'HARDWARE' if effective_use_tee else 'MOCK'})...")
   private_key = os.getenv("PRIVATE_KEY")
   tee_auth = TEEAuthenticator(
       domain=domain,
       salt=salt,
-      use_tee=False,  
+      use_tee=effective_use_tee,  
       private_key=private_key
   )
 
@@ -296,6 +314,34 @@ async def get_agent_state():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+@app.websocket("/api/stream")
+async def websocket_stream(websocket: WebSocket):
+    """Real-time data broadcast for Hackathon presentation."""
+    await websocket.accept()
+    try:
+        while True:
+            if trading_engine:
+                data = {
+                    "status": "running" if trading_engine.is_running else "halted",
+                    "current_llm_threshold": trading_engine.last_llm_threshold or 0.10,
+                    "last_spread": getattr(trading_engine, "_last_spread_pct", 0.0),
+                    "last_spot_price": getattr(trading_engine, "_last_spot", 0.0),
+                    "last_perp_price": getattr(trading_engine, "_last_perp", 0.0),
+                    "last_net_yield": getattr(trading_engine, "_last_net_yield_pct", 0.0),
+                    "circuit_breaker_active": trading_engine.circuit_breaker_tripped,
+                    "current_equity": trading_engine.current_equity,
+                    "peak_equity": trading_engine.peak_equity,
+                    "short_term_memory": trading_engine.short_term_memory,
+                    "latest_cid": getattr(trading_engine, "_last_cid", None),
+                    "scan_results": getattr(trading_engine, "_last_scan_results", []),
+                    "active_symbol": getattr(trading_engine, "active_symbol", "BTC"),
+                    "is_signing": getattr(trading_engine, "_is_signing", False),
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                await websocket.send_json(data)
+            await asyncio.sleep(1)
+    except Exception:
+        pass
 
 @app.get("/")
 async def root():
