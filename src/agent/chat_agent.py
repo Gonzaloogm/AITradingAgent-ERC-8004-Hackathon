@@ -9,7 +9,7 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 
-from anthropic import Anthropic
+from openai import AsyncOpenAI
 
 from .session_store import Session
 from .code_executor import execute_code
@@ -237,19 +237,18 @@ class ChatAgent:
         self.tool_handlers = tool_handlers
         self.code_timeout = int(os.getenv("CODE_EXECUTION_TIMEOUT", "30"))
 
-        # Initialize Anthropic client with Redpill backend
-        # Fall back to REDPILL_API_KEY if ANTHROPIC_AUTH_TOKEN not set
-        api_key = os.getenv("ANTHROPIC_AUTH_TOKEN") or os.getenv("REDPILL_API_KEY")
+        # Initialize OpenAI client for Groq
+        api_key = os.getenv("GROQ_API_KEY") or os.getenv("REDPILL_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")
         if not api_key:
             raise ValueError(
-                "Chat requires ANTHROPIC_AUTH_TOKEN or REDPILL_API_KEY environment variable"
+                "Chat requires GROQ_API_KEY, REDPILL_API_KEY, or ANTHROPIC_AUTH_TOKEN environment variable"
             )
 
-        self.client = Anthropic(
+        self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url=os.getenv("ANTHROPIC_BASE_URL", "https://api.redpill.ai")
+            base_url=os.getenv("GROQ_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "https://api.groq.com/openai/v1")
         )
-        self.model = os.getenv("ANTHROPIC_MODEL", "openai/gpt-oss-120b")
+        self.model = os.getenv("CHAT_MODEL") or os.getenv("ANTHROPIC_MODEL", "llama3-70b-8192")
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt with agent context."""
@@ -322,64 +321,66 @@ class ChatAgent:
         # Build messages for API
         messages = session.get_messages_for_api()
 
-        tool_calls = []
-        max_iterations = 10  # Prevent infinite loops
+        # OpenAI Tool Definitions Conversion (if needed, but they are very similar)
+        openai_tools = []
+        for t in TOOL_DEFINITIONS:
+            openai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t["description"],
+                    "parameters": t["input_schema"]
+                }
+            })
 
         for _ in range(max_iterations):
             # Call the API
-            response = self.client.messages.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
-                max_tokens=4096,
-                system=self._build_system_prompt(),
-                tools=TOOL_DEFINITIONS,
-                messages=messages
+                messages=[
+                    {"role": "system", "content": self._build_system_prompt()},
+                    *messages
+                ],
+                tools=openai_tools,
+                tool_choice="auto",
+                max_tokens=2048,
+                temperature=0.2
             )
 
-            # Check if we need to handle tool use
-            if response.stop_reason == "tool_use":
-                # Process each tool use block
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        tool_name = block.name
-                        tool_input = block.input
+            assistant_message = response.choices[0].message
+            content = assistant_message.content
+            tool_calls_req = assistant_message.tool_calls
 
-                        # Execute the tool
-                        result = await self._execute_tool(tool_name, tool_input)
-                        tool_calls.append({
-                            "tool": tool_name,
-                            "input": tool_input,
-                            "result": result
-                        })
+            if tool_calls_req:
+                # Add assistant message with tool calls to history
+                messages.append(assistant_message)
+                
+                # Process each tool call
+                for tool_call in tool_calls_req:
+                    tool_name = tool_call.function.name
+                    tool_input = json.loads(tool_call.function.arguments)
 
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(result)
-                        })
+                    # Execute the tool
+                    result = await self._execute_tool(tool_name, tool_input)
+                    tool_calls.append({
+                        "tool": tool_name,
+                        "input": tool_input,
+                        "result": result
+                    })
 
-                # Add assistant message with tool use
-                messages.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-
-                # Add tool results
-                messages.append({
-                    "role": "user",
-                    "content": tool_results
-                })
-
+                    # Add tool result to history
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_name,
+                        "content": json.dumps(result)
+                    })
             else:
-                # Extract text response
-                response_text = ""
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        response_text += block.text
-
-                # Add assistant message to session
-                session.add_message("assistant", response_text, tool_calls if tool_calls else None)
-
+                # Final response (text only)
+                response_text = content or ""
+                # Add assistant response to session (if any text was returned)
+                if response_text:
+                    session.add_message("assistant", response_text, tool_calls if tool_calls else None)
                 return response_text, tool_calls
 
         # If we hit max iterations, return what we have
