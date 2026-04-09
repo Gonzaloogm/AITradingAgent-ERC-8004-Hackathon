@@ -623,6 +623,7 @@ async def get_status():
       },
       "tee": {
           "enabled": getattr(tee_auth, 'use_tee', False),
+          "tee_mode": "HARDWARE" if getattr(tee_auth, 'use_tee', False) else "MOCK",
           "endpoint": getattr(tee_auth, 'tee_endpoint', None)
       },
       "timestamp": datetime.utcnow().isoformat()

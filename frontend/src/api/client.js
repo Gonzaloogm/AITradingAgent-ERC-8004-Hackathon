@@ -22,12 +22,13 @@ export class APIClient {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          console.warn(`[API] Malformed JSON: ${text}`);
-          return { success: false, error: 'Malformed response from backend' };
+          console.warn(`[API] Malformed JSON or Non-JSON response: ${text.slice(0, 100)}`);
+          // Fallback to empty object to prevent crash, but log for debugging
+          data = { _raw: text };
         }
       } else if (response.ok && response.status !== 204) {
-        // Expected data but got empty body
-        return { success: false, error: 'Waiting for enclave data...' };
+        // Expected data but got empty body - return success with empty object or custom signaling
+        return { success: true, data: {}, note: 'Empty response' };
       }
 
       if (!response.ok) {

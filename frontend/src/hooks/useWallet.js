@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { formatEth } from '../utils/formatters';
 
-export function useWallet(pollInterval = 5000) {
+export function useWallet(pollInterval = 10000) {
   const [wallet, setWallet] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(null);
