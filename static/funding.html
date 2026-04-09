@@ -306,7 +306,8 @@
             terminal.scrollTop = terminal.scrollHeight;
         }
 
-        const socket = new WebSocket(`ws://${window.location.host}/api/stream`);
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(`${wsProtocol}//${window.location.host}/api/stream`);
 
         socket.onopen = () => {
             wsStatus.innerText = 'STREAMS: LIVE';
