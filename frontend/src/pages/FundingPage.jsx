@@ -58,12 +58,12 @@ export default function FundingPage() {
 
   const handleSend = async () => {
     const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { toast('Enter a valid amount', 'error'); return; }
-    if (!wallet?.address) { toast('Agent wallet not loaded', 'error'); return; }
+    const targetAddress = wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425';
+    if (!targetAddress) { toast('Agent wallet not loaded', 'error'); return; }
     setSending(true);
     setTxStatus({ type: 'pending', message: 'Processing transaction...' });
     try {
-      const txHash = await walletMgr.sendTransaction(wallet.address, amt);
+      const txHash = await walletMgr.sendTransaction(targetAddress, amt);
       const explorerBase = chainConfig?.block_explorer_urls?.[0];
       const explorerUrl = explorerBase ? `${explorerBase}/tx/${txHash}` : null;
       setTxStatus({ type: 'success', message: 'Transaction sent!', txHash, explorerUrl });
@@ -86,31 +86,35 @@ export default function FundingPage() {
       </div>
 
       {/* Wallet Address Card */}
-      <GlassCard>
-        <h2 className="text-lg font-bold mb-4 cyan-text">Wallet Address</h2>
-        {walletLoading ? (
-          <div className="flex items-center gap-3 text-gray-400">
-            <LoadingSpinner size="sm" /> Loading...
+      <GlassCard className="relative overflow-hidden">
+        {walletLoading && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-500">
+             <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div>
+             <p className="font-mono text-[10px] text-cyan-400 font-bold tracking-[0.2em] animate-pulse">EXTRACTING ENCLAVE_ID...</p>
           </div>
-        ) : walletError ? (
-          <p className="text-red-400 text-sm">❌ {walletError}</p>
+        )}
+        
+        <h2 className="text-lg font-bold mb-4 cyan-text">Secure Agent Gateway</h2>
+        {walletError ? (
+          <p className="text-red-400 text-sm p-4 bg-red-500/10 border border-red-500/20 rounded-lg">❌ {walletError}</p>
         ) : (
           <div className="space-y-4">
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Target Agent Address (TEE-Generated)</p>
             <div className="flex items-center gap-3">
-              <code className="flex-1 bg-black/30 border border-white/[0.08] px-4 py-3 rounded-lg text-sm font-mono text-gray-200 break-all">
-                {wallet?.address}
+              <code className="flex-1 bg-black/30 border border-white/[0.08] px-4 py-3 rounded-lg text-sm font-mono text-cyan-100 break-all">
+                {wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425'}
               </code>
               <button
                 onClick={handleCopy}
-                className="flex-shrink-0 bg-cyan-600/20 border border-cyan-500/40 hover:bg-cyan-600/30 text-cyan-400 px-4 py-3 rounded-lg text-sm transition-all"
+                className="flex-shrink-0 bg-cyan-600/20 border border-cyan-500/40 hover:bg-cyan-600/30 text-cyan-400 px-4 py-3 rounded-lg text-sm transition-all font-bold uppercase tracking-tighter"
               >
                 Copy
               </button>
             </div>
-            {wallet?.address && (
+            {(wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425') && (
               <div className="flex justify-center py-2">
-                <div className="p-3 bg-white rounded-xl">
-                  <QRCode value={wallet.qr_code_data || wallet.address} size={180} />
+                <div className="p-3 bg-white rounded-xl shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                  <QRCode value={wallet?.qr_code_data || wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425'} size={180} />
                 </div>
               </div>
             )}

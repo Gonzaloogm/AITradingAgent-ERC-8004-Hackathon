@@ -40,7 +40,7 @@ export default function MarketScanner({ scanResults, activeSymbol }) {
                 )}
               </div>
               <div className={`text-lg font-mono font-bold ${item.spread > 0.1 ? 'text-emerald-400' : 'text-gray-300'}`}>
-                {item.spread.toFixed(3)}%
+                {item.real_time_spread ? item.real_time_spread.toFixed(3) : item.spread.toFixed(3)}%
               </div>
               <div className="mt-2 h-1 bg-white/10 rounded-full overflow-hidden">
                 <div 

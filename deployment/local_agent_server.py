@@ -325,7 +325,7 @@ async def websocket_stream(websocket: WebSocket):
                 data = {
                     "status": "running" if trading_engine.is_running else "halted",
                     "current_llm_threshold": trading_engine.last_llm_threshold or 0.10,
-                    "last_spread": getattr(trading_engine, "_last_spread_pct", 0.0),
+                    "real_time_spread": getattr(trading_engine, "_last_spread_pct", 0.0),
                     "last_spot_price": getattr(trading_engine, "_last_spot", 0.0),
                     "last_perp_price": getattr(trading_engine, "_last_perp", 0.0),
                     "last_net_yield": getattr(trading_engine, "_last_net_yield_pct", 0.0),

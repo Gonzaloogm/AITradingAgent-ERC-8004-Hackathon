@@ -14,13 +14,25 @@ export class APIClient {
         ...options,
         headers: { 'Content-Type': 'application/json', ...options.headers },
       });
-      const data = await response.json();
+
+      // Handle empty responses to prevent "Unexpected end of JSON input"
+      const text = await response.text();
+      let data = {};
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.warn(`[API] Failed to parse JSON: ${text}`);
+        }
+      }
+
       if (!response.ok) {
         const msg = data.detail || data.error || `HTTP ${response.status}`;
         throw new Error(msg);
       }
       return { success: true, data };
     } catch (error) {
+      console.error(`[API] ${endpoint} failed:`, error);
       return { success: false, error: error.message || 'Unknown error' };
     }
   }
