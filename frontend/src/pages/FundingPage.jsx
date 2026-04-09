@@ -25,10 +25,24 @@ export default function FundingPage() {
       const r = await apiClient.getChainConfig();
       if (r.success) {
         setChainConfig(r.data);
-        setWalletMgr(new WalletManager(r.data));
+        const manager = new WalletManager(r.data);
+        setWalletMgr(manager);
+        
+        // Auto-connect if session existed before reload
+        if (manager.shouldAutoConnect()) {
+           try {
+              const addr = await manager.connect();
+              setUserAddress(addr);
+              const balStr = await manager.getBalance(addr);
+              setUserBalance(balStr);
+              setConnected(true);
+           } catch (e) {
+              console.warn('[AutoConnect] Failed to restore session:', e);
+           }
+        }
       }
     })();
-  }, []);
+  }, [apiClient]);
 
   const handleCopy = async () => {
     if (!wallet?.address) return;

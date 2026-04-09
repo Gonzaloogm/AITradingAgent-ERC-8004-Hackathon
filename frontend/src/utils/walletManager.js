@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 /**
- * WalletManager — MetaMask integration using ethers.js v6
+ * WalletManager — MetaMask integration using ethers.js v6 with Session Management
  */
 export class WalletManager {
   constructor(chainConfig = null) {
@@ -11,10 +11,31 @@ export class WalletManager {
     this.chainConfig = chainConfig;
     this.chainId = chainConfig?.chain_id ?? null;
     this.connected = false;
+    
+    // Auto-setup listeners if window.ethereum is available
+    if (typeof window !== 'undefined' && window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        console.log('[WalletManager] Accounts changed, reloading...');
+        if (accounts.length === 0) {
+          localStorage.removeItem('isWalletConnected');
+        }
+        window.location.reload();
+      });
+      
+      window.ethereum.on('chainChanged', () => {
+        console.log('[WalletManager] Chain changed, reloading...');
+        window.location.reload();
+      });
+    }
   }
 
   isMetaMaskInstalled() {
     return typeof window.ethereum !== 'undefined';
+  }
+
+  /** Check if we have a persisted session */
+  shouldAutoConnect() {
+    return localStorage.getItem('isWalletConnected') === 'true';
   }
 
   async connect() {
@@ -22,33 +43,39 @@ export class WalletManager {
       throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
     }
 
-    // Initialize ethers provider from window.ethereum
-    this.provider = new ethers.BrowserProvider(window.ethereum);
-    
-    // Request accounts
-    const accounts = await this.provider.send("eth_requestAccounts", []);
-    this.signer = await this.provider.getSigner();
-    this.address = await this.signer.getAddress();
-    this.connected = true;
-
-    // Check network
-    const network = await this.provider.getNetwork();
-    if (Number(network.chainId) !== this.chainId) {
-      await this.switchNetwork();
-      // Re-initialize after network switch to be safe
+    try {
+      // Initialize ethers provider from window.ethereum
       this.provider = new ethers.BrowserProvider(window.ethereum);
+      
+      // Request accounts
+      const accounts = await this.provider.send("eth_requestAccounts", []);
+      if (accounts.length === 0) throw new Error("No accounts found");
+
       this.signer = await this.provider.getSigner();
+      this.address = await this.signer.getAddress();
+      this.connected = true;
+
+      // Persistence
+      localStorage.setItem('isWalletConnected', 'true');
+
+      // Check network
+      const network = await this.provider.getNetwork();
+      if (this.chainId && Number(network.chainId) !== this.chainId) {
+        await this.switchNetwork();
+        // Re-initialize after network switch to be safe
+        this.provider = new ethers.BrowserProvider(window.ethereum);
+      }
+
+      return this.address;
+    } catch (err) {
+      console.error("[WalletManager] Connection failed:", err);
+      localStorage.removeItem('isWalletConnected');
+      throw err;
     }
-
-    // Listen for changes
-    window.ethereum.on('accountsChanged', () => window.location.reload());
-    window.ethereum.on('chainChanged', () => window.location.reload());
-
-    return this.address;
   }
 
   async switchNetwork() {
-    if (!this.chainConfig) throw new Error('Chain configuration not loaded');
+    if (!this.chainConfig) return;
     
     const chainIdHex = `0x${this.chainId.toString(16)}`;
     
@@ -76,20 +103,17 @@ export class WalletManager {
   }
 
   async sendTransaction(toAddress, amountInEth) {
-    if (!this.connected || !this.provider) throw new Error('Wallet not connected');
+    if (!this.provider) {
+       this.provider = new ethers.BrowserProvider(window.ethereum);
+    }
 
     try {
-      // Always get a FRESH signer at the time of transaction
+      // Always get FRESH signer
       const currentSigner = await this.provider.getSigner();
       const fromAddress = await currentSigner.getAddress();
       
-      console.log(`[WalletManager] Initiating TEE Fueling:`);
-      console.log(` - From (User): ${fromAddress}`);
-      console.log(` - To (Agent): ${toAddress}`);
-      console.log(` - Amount: ${amountInEth} ETH`);
-
       if (fromAddress.toLowerCase() === toAddress.toLowerCase()) {
-        throw new Error("Self-Funding Lock: You are currently connected with the agent's account in MetaMask. Please switch to your personal account to send fuel.");
+        throw new Error("Self-Funding Error: You have the agent's account selected in MetaMask. Please switch to your personal account.");
       }
 
       const tx = await currentSigner.sendTransaction({
@@ -99,7 +123,7 @@ export class WalletManager {
       
       return tx.hash;
     } catch (error) {
-      console.error("[WalletManager] Transaction processing error:", error);
+      console.error("[WalletManager] Transaction error:", error);
       throw error;
     }
   }
@@ -116,5 +140,6 @@ export class WalletManager {
     this.address = null;
     this.signer = null;
     this.connected = false;
+    localStorage.removeItem('isWalletConnected');
   }
 }
