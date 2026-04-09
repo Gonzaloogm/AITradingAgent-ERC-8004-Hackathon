@@ -1,9 +1,11 @@
 /**
  * API Client — ported from wallet-utils.js
  */
+const PHALA_URL = 'https://d571a329e5081e0d1b8fd65773ba0cd84e9e3457-8000.dstack-pha-prod9.phala.network';
+
 export class APIClient {
-  constructor(baseURL = '') {
-    this.baseURL = baseURL;
+  constructor() {
+    this.baseURL = window.location.hostname === 'localhost' ? PHALA_URL : '';
   }
 
   async request(endpoint, options = {}) {

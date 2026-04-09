@@ -84,68 +84,102 @@ export default function DashboardPage() {
 
   // Establish WebSocket for agent state and dynamically populate algorithmic logs
   useEffect(() => {
-    let lastExecTime = 0;
+    let lastExecTime = { time: 0, _lastSym: null };
     let ws = null;
+    let reconnectTimeout = null;
+    let reconnectAttempts = 0;
+
+    const connect = () => {
+      if (!agentReady) return;
+
+      // Dynamic Host Detection: Use Phala production host if on localhost
+      const PHALA_HOST = 'd571a329e5081e0d1b8fd65773ba0cd84e9e3457-8000.dstack-pha-prod9.phala.network';
+      const isLocal = window.location.hostname === 'localhost';
+      const host = isLocal ? PHALA_HOST : window.location.host;
+      const protocol = isLocal || window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      
+      const wsUrl = `${protocol}//${host}/api/stream`;
+      console.log(`[WS] Connecting to ${wsUrl}...`);
+      ws = new WebSocket(wsUrl);
+       
+      ws.onopen = () => {
+        reconnectAttempts = 0;
+        console.log("[WS] Connection established.");
+        setTerminalLogs(prev => [...prev.slice(-49), "[WS] Connection established. Telemetry ACTIVE."]);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+           const data = JSON.parse(event.data);
+           setAgentState(data);
+           
+           if (data.status !== "halted") {
+                setTerminalLogs(prev => {
+                  let newLogs = [...prev];
+                  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+                  
+                  // Show PRISM Scan result if changed
+                  if (data.active_symbol && data.active_symbol !== lastExecTime._lastSym) {
+                       newLogs.push(`[${time}] [PRISM] Global Scan: Best opportunity found on ${data.active_symbol}.`);
+                       lastExecTime._lastSym = data.active_symbol;
+                  }
+
+                  // Show MCP Tool Calls
+                  const mcpMsg = `[${time}] [MCP] kraken_exchange.get_ticker({"pair": "${data.active_symbol}/USD"})`;
+                  if (newLogs.length === 0 || !newLogs.some(l => l.includes(mcpMsg))) {
+                       newLogs.push(mcpMsg);
+                  }
+
+                  const tickMsg = `[${time}] [SCAN] ${data.active_symbol}: $${data.last_spot_price?.toFixed(2)} | Spread: ${data.last_spread?.toFixed(4)}% | Min: ${data.current_llm_threshold?.toFixed(4)}%`;
+                  
+                  if (newLogs.length === 0 || newLogs[newLogs.length - 1] !== tickMsg) {
+                      newLogs.push(tickMsg);
+                  }
+                  
+                  if (data.is_signing && Date.now() - (lastExecTime.time || 0) > 10000) {
+                     lastExecTime.time = Date.now();
+                     newLogs.push(`[${time}] [AI] Yield verified. Initiating TEE-signing protocol.`);
+                     newLogs.push(`[${time}] [SIG] EIP-712 Signature generated for ${data.active_symbol} trade.`);
+                     if (data.latest_cid) {
+                         newLogs.push(`[${time}] [IPFS] Integrity Proof Pinned: ${data.latest_cid}`);
+                     }
+                  }
+
+                  if (data.circuit_breaker_active && !newLogs.some(l => l.includes("CIRCUIT BREAKER"))) {
+                      newLogs.push(`[${time}] [CRITICAL] CIRCUIT BREAKER TRIPPED! TRADING HALTED.`);
+                  }
+
+                  if (newLogs.length > 50) return newLogs.slice(newLogs.length - 50);
+                  return newLogs;
+                });
+           }
+        } catch (e) {
+           console.error("[WS] Parse error", e);
+        }
+      };
+
+      ws.onerror = (e) => {
+        console.error("[WS] Error occurred", e);
+      };
+
+      ws.onclose = () => {
+        console.warn("[WS] Socket closed. Attempting reconnect...");
+        setTerminalLogs(prev => [...prev.slice(-49), "[WS] Link Severed. Attempting self-healing..."]);
+        
+        // Exponential backoff for reconnection
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+        reconnectAttempts++;
+        reconnectTimeout = setTimeout(connect, delay);
+      };
+    };
 
     if (agentReady) {
-       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-       ws = new WebSocket(`${protocol}//${window.location.host}/api/stream`);
-       
-       ws.onmessage = (event) => {
-          try {
-             const data = JSON.parse(event.data);
-             setAgentState(data);
-             
-             if (data.status !== "halted") {
-                  setTerminalLogs(prev => {
-                    let newLogs = [...prev];
-                    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-                    
-                    // Show PRISM Scan result if changed
-                    if (data.active_symbol && data.active_symbol !== lastExecTime._lastSym) {
-                         newLogs.push(`[${time}] [PRISM] Global Scan: Best opportunity found on ${data.active_symbol}.`);
-                         lastExecTime._lastSym = data.active_symbol;
-                    }
-
-                    // Show MCP Tool Calls
-                    const mcpMsg = `[${time}] [MCP] kraken_exchange.get_ticker({"pair": "${data.active_symbol}/USD"})`;
-                    if (newLogs.length === 0 || !newLogs.some(l => l.includes(mcpMsg))) {
-                         newLogs.push(mcpMsg);
-                    }
-
-                    const tickMsg = `[${time}] [SCAN] ${data.active_symbol}: $${data.last_spot_price?.toFixed(2)} | Spread: ${data.last_spread?.toFixed(4)}% | Min: ${data.current_llm_threshold?.toFixed(4)}%`;
-                    
-                    if (newLogs.length === 0 || newLogs[newLogs.length - 1] !== tickMsg) {
-                        newLogs.push(tickMsg);
-                    }
-                    
-                    if (data.is_signing && Date.now() - (lastExecTime.time || 0) > 10000) {
-                       lastExecTime.time = Date.now();
-                       newLogs.push(`[${time}] [AI] Yield verified. Initiating TEE-signing protocol.`);
-                       newLogs.push(`[${time}] [SIG] EIP-712 Signature generated for ${data.active_symbol} trade.`);
-                       if (data.latest_cid) {
-                           newLogs.push(`[${time}] [IPFS] Integrity Proof Pinned: ${data.latest_cid}`);
-                       }
-                    }
-
-                    if (data.circuit_breaker_active && !newLogs.some(l => l.includes("CIRCUIT BREAKER"))) {
-                        newLogs.push(`[${time}] [CRITICAL] CIRCUIT BREAKER TRIPPED! TRADING HALTED.`);
-                    }
-
-                    if (newLogs.length > 50) return newLogs.slice(newLogs.length - 50);
-                    return newLogs;
-                  });
-             }
-          } catch (e) {
-             console.error("WS Parse error", e);
-          }
-       };
-
-       ws.onerror = (e) => console.error("WebSocket error", e);
+      connect();
     }
 
     return () => {
         if (ws) ws.close();
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, [agentReady]);
 
