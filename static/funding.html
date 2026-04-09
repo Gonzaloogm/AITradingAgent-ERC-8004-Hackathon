@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STRIKER | TEE Performance Enclave</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00ff41;
+            --secondary: #003300;
+            --bg: #050505;
+            --panel: rgba(10, 15, 10, 0.9);
+            --border: rgba(0, 255, 65, 0.3);
+            --text: #e0e0e0;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        .logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+        }
+
+        .status-badge {
+            background: var(--secondary);
+            border: 1px solid var(--primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 65, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0); }
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            flex-grow: 1;
+            min-height: 0;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-grow: 1;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-heading {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            opacity: 0.8;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .metric-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 255, 65, 0.1);
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .metric-label { font-size: 0.75rem; opacity: 0.6; }
+        .metric-value { font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .metric-change { font-size: 0.8rem; color: var(--primary); }
+
+        .terminal {
+            background: #000;
+            color: #008f11;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 15px;
+            border-radius: 4px;
+            flex-grow: 1;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            border: 1px inset var(--border);
+        }
+
+        .terminal span { color: #aaa; }
+        .terminal b { color: var(--primary); }
+
+        .scan-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 255, 65, 0.05);
+        }
+
+        #net-yield { color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">STRIKER_ENCLAVE</div>
+        <div class="status-badge">
+            <div class="pulse"></div>
+            TEE HARDWARE VERIFIED: INTEL TDX
+        </div>
+    </div>
+
+    <div class="main-grid">
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            <div class="panel">
+                <div class="panel-heading">Core Intelligence</div>
+                <div class="metric-card">
+                    <div class="metric-label">Best Opportunity / Net Yield</div>
+                    <div class="metric-value"><span id="active-symbol">---</span> <small id="net-yield">0.00%</small></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">LLM Risk Threshold</div>
+                    <div class="metric-value" id="llm-threshold">0.080%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Spot / Perp Spread</div>
+                    <div class="metric-value" id="current-spread">0.000%</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-heading">PRISM Real-time Scan</div>
+                <div id="scan-list">
+                    <!-- Scan results injected here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-heading">
+                Live Agent Terminal
+                <span id="terminal-status" style="font-size: 0.7rem;">STREAM: CONNECTING...</span>
+            </div>
+            <div class="terminal" id="terminal">
+                [SYSTEM] Initializing telemetry stream...
+                [SYSTEM] Connecting to TEE WebSocket...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById('terminal');
+        const ws = new WebSocket(`ws://${window.location.host}/api/stream`);
+
+        function logToTerminal(msg) {
+            const time = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.innerHTML = `<span>[${time}]</span> ${msg}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        ws.onopen = () => {
+            document.getElementById('terminal-status').innerText = 'STREAM: ACTIVE';
+            logToTerminal('<b>CONNECTED</b> to Phala CVM Enclave.');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            // Update Core Metrics
+            document.getElementById('active-symbol').innerText = data.active_symbol + '/USDC';
+            document.getElementById('net-yield').innerText = '+' + data.last_net_yield.toFixed(3) + '%';
+            document.getElementById('llm-threshold').innerText = data.current_llm_threshold.toFixed(3) + '%';
+            document.getElementById('current-spread').innerText = data.last_spread.toFixed(3) + '%';
+
+            // Update Scan List
+            const scanList = document.getElementById('scan-list');
+            scanList.innerHTML = '';
+            (data.scan_results || []).forEach(res => {
+                const div = document.createElement('div');
+                div.className = 'scan-item';
+                div.innerHTML = `<span>${res.symbol}/USDC</span> <b>+${res.net_yield.toFixed(3)}%</b>`;
+                scanList.appendChild(div);
+            });
+
+            // Log new entries to terminal if memory has changed
+            if (data.short_term_memory && data.short_term_memory.length > 0) {
+                const lastMem = data.short_term_memory[data.short_term_memory.length - 1];
+                if (window.lastLoggedMem !== lastMem) {
+                    logToTerminal(lastMem.replace('EXECUTE', '<b>EXECUTE</b>').replace('SKIP', '<i>SKIP</i>'));
+                    window.lastLoggedMem = lastMem;
+                }
+            }
+        };
+
+        ws.onclose = () => {
+            document.getElementById('terminal-status').innerText = 'STREAM: OFFLINE';
+            logToTerminal('<b style="color:red">DISCONNECTED</b>. Reconnecting in 5s...');
+            setTimeout(() => window.location.reload(), 5000);
+        };
+    </script>
+</body>
+</html>
