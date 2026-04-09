@@ -8,6 +8,8 @@ import TrustEnclaveTerminal from '../components/agent/TrustEnclaveTerminal';
 import StrykrIntelligenceLog from '../components/agent/StrykrIntelligenceLog';
 import ChatInterface from '../components/chat/ChatInterface';
 import PrismScanSidebar from '../components/agent/PrismScanSidebar';
+import { useAgentStatus } from '../hooks/useAgentStatus';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -24,7 +26,10 @@ export default function DashboardPage() {
   });
   const [agentReady, setAgentReady] = useState(false);
   const [agentId, setAgentId] = useState(null);
-  const [activeTab, setActiveTab] = useState('intelligence'); // 'intelligence' or 'debug'
+  const [activeTab, setActiveTab] = useState('intelligence'); 
+  
+  // Real-time Agent Status Hook
+  const { status, loading: statusLoading, error: statusError } = useAgentStatus(10000);
 
   // New Terminal Dashboard State
   const [agentState, setAgentState] = useState({
@@ -63,25 +68,19 @@ export default function DashboardPage() {
     if (isFunded && currentStep < 1) setCurrentStep(1);
   }, [isFunded, currentStep]);
 
-  // Check if already registered on mount
+  // Sync agent identity from Status Hook (Fast Path)
   useEffect(() => {
-    (async () => {
-      const result = await apiClient.getStatus();
-      if (result.success) {
-        const agent = result.data.agent;
-        if (agent.is_registered && agent.agent_id) {
-          setAgentId(agent.agent_id);
-          setReg({
-            started: true,
-            identity:  { status: 'SUCCESS', message: `Registered (ID: ${agent.agent_id})` },
-            reputation:{ status: 'SUCCESS', message: 'Confirmed' },
-          });
-          setCurrentStep(2);
-          setAgentReady(true);
-        }
-      }
-    })();
-  }, []);
+    if (status?.agent?.is_registered) {
+      setAgentId(status.agent.agent_id);
+      setAgentReady(true);
+      setCurrentStep(2);
+      setReg({
+        started: true,
+        identity:  { status: 'SUCCESS', message: `Registered (ID: ${status.agent.agent_id})` },
+        reputation:{ status: 'SUCCESS', message: 'Confirmed' },
+      });
+    }
+  }, [status]);
 
   // Establish WebSocket for agent state and dynamically populate algorithmic logs
   useEffect(() => {
@@ -254,7 +253,17 @@ export default function DashboardPage() {
     }
   }
 
-  const allRegDone = reg.identity.status === 'SUCCESS' && reg.reputation.status === 'SUCCESS';
+  const allRegDone = (status?.agent?.is_registered) || (reg.identity.status === 'SUCCESS' && reg.reputation.status === 'SUCCESS');
+
+  if (walletLoading || statusLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0E14] text-cyan-400">
+        <LoadingSpinner size="lg" />
+        <p className="mt-6 font-mono text-sm tracking-[0.3em] animate-pulse">Initializing TEE Enclave...</p>
+        <p className="text-[10px] text-gray-500 mt-2 uppercase">Verifying Intel TDX Identity Handshake</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-fit text-gray-200 mt-2 space-y-8 pb-12">
@@ -404,7 +413,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-12 xl:col-span-4 flex flex-col gap-8">
           
           <TrustCenter 
-            agentStatus={status?.data} 
+            agentStatus={status} 
             teeState={agentState} 
           />
 
