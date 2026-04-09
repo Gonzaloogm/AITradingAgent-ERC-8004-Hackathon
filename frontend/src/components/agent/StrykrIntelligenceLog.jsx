@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 
 export default function StrykrIntelligenceLog({ scanResults, activeSymbol, logs }) {
+  const logEndRef = useRef(null);
+  const logContainerRef = useRef(null);
+
+  // Auto-scroll logs to bottom on update
+  useEffect(() => {
+    if (logEndRef.current) {
+        logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
   // Use results or defaults
   const results = scanResults?.length > 0 ? scanResults : [
     { symbol: 'BTC', spread: 0.082, confidence: 0.98, funding: 0.0001 },
@@ -66,10 +75,13 @@ export default function StrykrIntelligenceLog({ scanResults, activeSymbol, logs 
         <div className="bg-white/5 border-b border-white/5 px-6 py-4 flex justify-between items-center">
             <h3 className="font-mono text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Enclave System Trace</h3>
         </div>
-        <div className="p-6 h-[200px] overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-thin">
+        <div 
+          ref={logContainerRef}
+          className="p-6 h-[200px] overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-thin"
+        >
             {(logs && logs.length > 0) ? (
-                logs.slice(-15).map((log, i) => (
-                    <div key={i} className="mb-2 text-gray-500 flex gap-4">
+                logs.slice(-20).map((log, i) => (
+                    <div key={i} className="mb-2 text-gray-500 flex gap-4 animate-in slide-in-from-left-2 duration-300">
                         <span className="text-gray-700">[{i.toString(16).padStart(4, '0')}]</span>
                         <span className={log.includes('EXECUTE') ? 'text-emerald-400 font-bold' : log.includes('SKIP') ? 'text-gray-400 italic' : 'text-gray-300'}>
                             {log}
@@ -79,6 +91,7 @@ export default function StrykrIntelligenceLog({ scanResults, activeSymbol, logs 
             ) : (
                 <div className="text-gray-700 italic">No system trace events recorded...</div>
             )}
+            <div ref={logEndRef} />
         </div>
       </div>
     </div>

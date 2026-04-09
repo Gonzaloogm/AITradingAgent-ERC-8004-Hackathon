@@ -7,6 +7,7 @@ import TrustCenter from '../components/agent/TrustCenter';
 import TrustEnclaveTerminal from '../components/agent/TrustEnclaveTerminal';
 import StrykrIntelligenceLog from '../components/agent/StrykrIntelligenceLog';
 import ChatInterface from '../components/chat/ChatInterface';
+import PrismScanSidebar from '../components/agent/PrismScanSidebar';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -111,7 +112,12 @@ export default function DashboardPage() {
       ws.onmessage = (event) => {
         try {
            const data = JSON.parse(event.data);
-           setAgentState(data);
+           // Handle telemetry renaming from backend
+           const sanitizedData = {
+              ...data,
+              last_spread: data.real_time_spread || data.last_spread // Fallback for UI binding
+           };
+           setAgentState(sanitizedData);
            
            if (data.status !== "halted") {
                 setTerminalLogs(prev => {
@@ -277,7 +283,7 @@ export default function DashboardPage() {
         <div className="flex gap-8 items-center z-10">
            <div className="text-right font-mono">
               <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Portfolio Equity</p>
-              <p className="text-3xl font-black text-white">{(agentState.current_equity || 0).toFixed(4)} <span className="text-cyan-500/50 text-xl italic">ETH</span></p>
+              <p className="text-3xl font-black text-white">{formattedBalance} <span className="text-cyan-500/50 text-xl italic">ETH</span></p>
            </div>
         </div>
       </div>
@@ -400,6 +406,11 @@ export default function DashboardPage() {
           <TrustCenter 
             agentStatus={status?.data} 
             teeState={agentState} 
+          />
+
+          <PrismScanSidebar 
+            scanResults={agentState.scan_results} 
+            activeSymbol={agentState.active_symbol} 
           />
 
           <div className="bg-white/[0.02] rounded-3xl border border-white/5 p-8 space-y-6">
