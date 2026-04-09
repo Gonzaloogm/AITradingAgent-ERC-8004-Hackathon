@@ -66,8 +66,9 @@ app = FastAPI(
   version="1.0.0"
 )
 
-# Mount static files
+# Mount static files (Harden: Ensure directory exists immediately before mount to avoid RuntimeError)
 static_path = os.path.join(os.path.dirname(__file__), '..', 'static')
+os.makedirs(static_path, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # Global agent instance
