@@ -22,8 +22,12 @@ export class APIClient {
         try {
           data = JSON.parse(text);
         } catch (e) {
-          console.warn(`[API] Failed to parse JSON: ${text}`);
+          console.warn(`[API] Malformed JSON: ${text}`);
+          return { success: false, error: 'Malformed response from backend' };
         }
+      } else if (response.ok && response.status !== 204) {
+        // Expected data but got empty body
+        return { success: false, error: 'Waiting for enclave data...' };
       }
 
       if (!response.ok) {

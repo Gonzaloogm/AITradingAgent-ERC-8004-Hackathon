@@ -9,13 +9,18 @@ export function useWallet(pollInterval = 5000) {
 
   const fetchWallet = useCallback(async () => {
     const result = await apiClient.getWallet();
-    if (result.success) {
+    if (result.success && result.data?.address) {
       setWallet(result.data);
       setError(null);
+      setLoading(false);
     } else {
-      setError(result.error);
+      // If result is failure OR address is missing, we treat it as "still loading" enclave identity
+      if (!result.success && result.error !== 'Waiting for enclave data...') {
+        setError(result.error);
+        setLoading(false);
+      }
+      // Otherwise, keep loading = true so the UI stays in "initializing" state
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {

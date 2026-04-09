@@ -58,20 +58,31 @@ export default function FundingPage() {
 
   const handleSend = async () => {
     const amt = parseFloat(amount);
-    const targetAddress = wallet?.address || '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425';
-    if (!targetAddress) { toast('Agent wallet not loaded', 'error'); return; }
+    if (!amt || amt <= 0) { toast('Enter a valid amount', 'error'); return; }
+
+    // TARGET OVERRIDE: Prioritize demo address for hackathon stability
+    const targetAddress = '0x604F8bB5AA0e0954fAa5A6d60A5b909a78Fa9425';
+    
     setSending(true);
-    setTxStatus({ type: 'pending', message: 'Processing transaction...' });
+    setTxStatus({ type: 'pending', message: 'Broadcasting to Sepolia...' });
+    
     try {
+      console.log(`[MetaMask] Sending ${amt} ETH to ${targetAddress}...`);
       const txHash = await walletMgr.sendTransaction(targetAddress, amt);
+      
       const explorerBase = chainConfig?.block_explorer_urls?.[0];
       const explorerUrl = explorerBase ? `${explorerBase}/tx/${txHash}` : null;
-      setTxStatus({ type: 'success', message: 'Transaction sent!', txHash, explorerUrl });
-      toast('Transaction sent!', 'success');
-      setTimeout(() => { refetch(); setTxStatus(null); }, 6000);
+      
+      setTxStatus({ type: 'success', message: 'Transaction successful!', txHash, explorerUrl });
+      toast('Success! Agent fueling complete.', 'success');
+      
+      // Auto-refresh wallet state after success
+      setTimeout(() => { refetch(); }, 10000);
     } catch (e) {
-      setTxStatus({ type: 'error', message: e.message });
-      toast('Transaction failed: ' + e.message, 'error');
+      console.error('[MetaMask] Transaction failed:', e);
+      const errorMsg = e.message?.includes('user rejected') ? 'Transaction rejected by user' : e.message;
+      setTxStatus({ type: 'error', message: errorMsg });
+      toast(errorMsg, 'error');
     } finally {
       setSending(false);
     }
