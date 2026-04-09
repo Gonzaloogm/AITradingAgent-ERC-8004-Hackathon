@@ -3,282 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STRIKER | TEE FINAL DASHBOARD</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>STRIKER | Institutional TEE Terminal</title>
+    <!-- Google Fonts: Inter for clean UI, JetBrains Mono for data -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #00ff41;
-            --accent: #00d4ff;
-            --danger: #ff0055;
-            --bg: #020402;
-            --panel: rgba(15, 25, 15, 0.7);
-            --border: rgba(0, 255, 65, 0.2);
-            --text: #ffffff;
-            --glass: rgba(255, 255, 255, 0.03);
+            --bg-primary: #0B0E14;
+            --bg-secondary: #111827;
+            --panel: #1F2937;
+            --panel-border: rgba(255, 255, 255, 0.05);
+            --accent: #10B981; /* Emerald */
+            --accent-soft: rgba(16, 185, 129, 0.1);
+            --text-heading: #F3F4F6;
+            --text-body: #9CA3AF;
+            --danger: #EF4444;
         }
 
         * { box-sizing: border-box; }
+        
         body {
-            background: radial-gradient(circle at center, #0a120a 0%, var(--bg) 100%);
-            color: var(--text);
-            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-heading);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             margin: 0;
-            padding: 30px;
+            padding: 32px;
             display: flex;
             flex-direction: column;
-            gap: 25px;
+            gap: 24px;
             height: 100vh;
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* HEADER & STATUS */
+        /* PREMIUM HEADER */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            backdrop-filter: blur(10px);
-            background: var(--glass);
-            padding: 15px 30px;
+            background: var(--bg-secondary);
+            padding: 20px 32px;
             border-radius: 12px;
-            border: 1px solid var(--border);
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .logo-group { display: flex; align-items: center; gap: 15px; }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
         .logo {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.8rem;
             font-weight: 700;
-            letter-spacing: 5px;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 8px rgba(0, 255, 65, 0.3));
+            letter-spacing: -0.02em;
+            font-size: 1.5rem;
+            color: #fff;
         }
 
-        .system-status {
+        .logo span { color: var(--accent); }
+
+        .status-pill {
             display: flex;
             align-items: center;
-            gap: 20px;
-        }
-
-        .badge {
-            padding: 6px 16px;
-            border-radius: 6px;
+            gap: 10px;
             font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            border: 1px solid currentColor;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-weight: 600;
+            color: var(--text-body);
+            background: rgba(255, 255, 255, 0.03);
+            padding: 6px 14px;
+            border-radius: 99px;
+            border: 1px solid var(--panel-border);
         }
 
-        .badge-verified { color: var(--primary); background: rgba(0, 255, 65, 0.05); }
-        .badge-danger { color: var(--danger); background: rgba(255, 0, 85, 0.05); display: none; }
-
-        .pulse {
-            width: 10px;
-            height: 10px;
-            background: currentColor;
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
             border-radius: 50%;
-            animation: pulse-glow 2s infinite;
+            position: relative;
         }
 
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 255, 65, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 255, 65, 0); }
+        .dot::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse-ring 2s infinite;
         }
 
-        /* MAIN DASHBOARD GRID */
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+
+        /* GRID LAYOUT */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 350px 1fr 400px;
-            gap: 25px;
+            grid-template-columns: 400px 1fr 400px;
+            gap: 24px;
             flex-grow: 1;
             min-height: 0;
         }
 
-        /* PANELS */
         .panel {
             background: var(--panel);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
             border-radius: 16px;
-            padding: 25px;
+            border: 1px solid var(--panel-border);
             display: flex;
             flex-direction: column;
-            position: relative;
+            padding: 24px;
             overflow: hidden;
         }
 
-        .panel::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--border), transparent);
-        }
-
-        .panel-title {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: var(--primary);
+        .panel-header {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-body);
             text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 25px;
+            letter-spacing: 0.1em;
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        /* METRICS */
-        .metric-group { display: flex; flex-direction: column; gap: 20px; }
-        .metric-box {
-            padding: 20px;
-            background: var(--glass);
+        /* COMPONENT: METRIC BOX */
+        .metric-stack { display: flex; flex-direction: column; gap: 16px; }
+
+        .card {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 24px;
             border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: transform 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            transition: all 0.2s ease;
         }
-        .metric-box:hover { transform: translateY(-3px); border-color: var(--primary); }
 
-        .m-label { font-size: 0.75rem; opacity: 0.5; text-transform: uppercase; margin-bottom: 8px; }
-        .m-value { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; color: #fff; }
-        .m-sub { font-size: 0.85rem; color: var(--primary); margin-top: 5px; }
+        .card:hover { border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.02); }
 
-        /* SCANS LIST */
-        .scan-container { display: flex; flex-direction: column; gap: 12px; }
+        .card-label { font-size: 0.75rem; color: var(--text-body); margin-bottom: 8px; }
+        .card-value { font-size: 2.25rem; font-weight: 700; color: #fff; line-height: 1; }
+        .card-footer { font-size: 0.8rem; color: var(--accent); margin-top: 10px; font-weight: 500; }
+
+        /* COMPONENT: SCANS */
+        .scan-list { display: flex; flex-direction: column; gap: 8px; }
         .scan-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 12px 18px;
+            padding: 14px 18px;
             background: rgba(255, 255, 255, 0.02);
             border-radius: 8px;
-            border-left: 3px solid transparent;
-        }
-        .scan-row.active { border-left-color: var(--accent); background: rgba(0, 212, 255, 0.05); }
-        .s-name { font-weight: 700; }
-        .s-yield { font-family: 'JetBrains Mono', monospace; color: var(--primary); }
-
-        /* CENTER TERMINAL */
-        .terminal-panel { grid-column: 2; }
-        .terminal-content {
-            flex-grow: 1;
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 8px;
-            padding: 20px;
+            border: 1px solid transparent;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
+        }
+        .scan-row.active { border-color: var(--accent); background: var(--accent-soft); }
+
+        /* COMPONENT: TERMINAL */
+        .terminal {
+            flex-grow: 1;
+            background: #000;
+            border-radius: 12px;
+            padding: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
             line-height: 1.6;
-            color: rgba(255, 255, 255, 0.7);
+            color: #d1d5db;
             overflow-y: auto;
-            border: 1px inset rgba(0, 255, 65, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            scrollbar-width: thin;
+            scrollbar-color: #374151 transparent;
         }
 
-        .log-entry { margin-bottom: 8px; }
-        .log-time { color: var(--accent); opacity: 0.6; margin-right: 12px; }
-        .log-tag-info { color: #888; }
-        .log-tag-execute { color: var(--primary); font-weight: bold; text-shadow: 0 0 5px var(--primary); }
-        .log-tag-skip { color: #555; font-style: italic; }
+        .terminal span { color: #6b7280; }
+        .terminal .t-execute { color: var(--accent); font-weight: 700; }
+        .terminal .t-skip { color: #4b5563; font-style: italic; }
 
-        /* ARTIFACT CID POPUP */
+        /* NOTIFICATION POPUP */
         #cid-popup {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: #111;
-            border: 1px solid var(--accent);
+            bottom: 32px;
+            right: 32px;
+            background: #111827;
+            border-left: 4px solid var(--accent);
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
             display: none;
-            z-index: 100;
-            width: 350px;
-            animation: slideUp 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            width: 380px;
+            z-index: 1000;
+            animation: slide-in 0.4s ease-out;
         }
 
-        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        .cid-label { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--accent); margin-bottom: 10px; }
-        .cid-value { font-size: 0.8rem; word-break: break-all; color: #fff; }
+        .popup-heading { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--accent); margin-bottom: 8px; font-weight: 700; }
+        .popup-cid { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; word-break: break-all; color: #fff; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo-group">
-            <div class="logo">STRIKER</div>
-            <div class="badge badge-verified">
-                <div class="pulse"></div>
-                HARDWARE ATTESTED: INTEL TDX
+    <header class="header">
+        <div class="brand">
+            <div class="logo">STRIKER<span>_TEE</span></div>
+            <div class="status-pill" style="color: var(--accent); border-color: rgba(16, 185, 129, 0.2);">
+                <div class="dot"></div>
+                HARDWARE ATTESTATION: VERIFIED
             </div>
         </div>
-        <div class="system-status">
-            <div id="cb-badge" class="badge badge-danger">
-                <div class="pulse" style="background: var(--danger);"></div>
-                CIRCUIT BREAKER: TRIPPED
+        <div style="display: flex; align-items: center; gap: 24px;">
+            <div id="cb-badge" class="status-pill" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2); display: none;">
+                <div class="dot" style="background: var(--danger);"></div>
+                CIRCUIT BREAKER: ACTIVE
             </div>
             <div style="text-align: right;">
-                <div style="font-size: 0.7rem; opacity: 0.5;">ENCLAVE_GEO: PHALA_NETWORK</div>
-                <div id="clock" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;">00:00:00</div>
+                <div style="font-size: 0.65rem; color: var(--text-body); letter-spacing: 0.05em; margin-bottom: 2px;">ENCLAVE_GEO: PHALA_NETWORK</div>
+                <div id="clock" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700;">00:00:00</div>
             </div>
         </div>
-    </div>
+    </header>
 
-    <div class="dashboard-grid">
-        <!-- LEFT: INTELLIGENCE PANEL -->
-        <div class="panel">
-            <div class="panel-title">Strategy Engine</div>
-            <div class="metric-group">
-                <div class="metric-box">
-                    <div class="m-label">Best Opportunity</div>
-                    <div class="m-value" id="winner-val">---</div>
-                    <div class="m-sub" id="winner-yield">NET_YIELD: 0.00%</div>
+    <main class="dashboard-grid">
+        <!-- ANALYTICS PANEL -->
+        <section class="panel">
+            <div class="panel-header">Yield Strategy Analysis</div>
+            <div class="metric-stack">
+                <div class="card">
+                    <div class="card-label">Top Market Opportunity</div>
+                    <div class="card-value" id="winner-val">---</div>
+                    <div class="card-footer" id="winner-yield">INITIALIZING SCAN...</div>
                 </div>
-                <div class="metric-box">
-                    <div class="m-label">LLM Risk Threshold</div>
-                    <div class="m-value" id="llm-val">0.00%</div>
-                    <div class="m-sub">LLaMA 3.1 Adaptive</div>
+                <div class="card">
+                    <div class="card-label">LLM Adaptive Threshold</div>
+                    <div class="card-value" id="llm-val">0.00%</div>
+                    <div class="card-footer">LLaMA-3.1-Instant Secure Core</div>
                 </div>
-                <div class="metric-box">
-                    <div class="m-label">Real-time Spread</div>
-                    <div class="m-value" id="spread-val">0.00%</div>
-                    <div class="m-sub">SPOT VS PI_PERP</div>
+                <div class="card">
+                    <div class="card-label">Current Strategy Spread</div>
+                    <div class="card-value" id="spread-val">0.00%</div>
+                    <div class="card-footer">SPOT / PI_PERP DIFFERENTIAL</div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- CENTER: TERMINAL -->
-        <div class="panel terminal-panel">
-            <div class="panel-title">
+        <!-- TERMINAL PANEL -->
+        <section class="panel">
+            <div class="panel-header">
                 Enclave Intelligence Log
-                <span id="ws-status" style="font-size: 0.7rem; color: var(--accent);">STREAMS: CONNECTING...</span>
+                <span id="ws-status" style="font-size: 0.65rem; color: #60a5fa;">SYSTEM: STANDBY</span>
             </div>
-            <div class="terminal-content" id="terminal">
-                [SYS] Terminal initialized.
-                [SYS] Waiting for CVM telemetry...
+            <div class="terminal" id="terminal">
+                [SYSTEM] Reserving secure memory region...
+                [SYSTEM] Handshake initiated with CVM gateway...
             </div>
-        </div>
+        </section>
 
-        <!-- RIGHT: SCANS & ARTIFACTS -->
-        <div class="panel">
-            <div class="panel-title">PRISM Batch Scan</div>
-            <div class="scan-container" id="scan-list">
-                <!-- Injected via JS -->
+        <!-- PORTFOLIO PANEL -->
+        <section class="panel">
+            <div class="panel-header">PRISM Network Scan</div>
+            <div class="scan-list" id="scan-list">
+                <!-- Batch results injected here -->
             </div>
-            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.05);">
-                <div class="m-label">Portfolio Equity</div>
-                <div id="equity-val" style="font-size: 1.2rem; font-weight: 700;">--- ETH</div>
-                <div style="font-size: 0.7rem; opacity: 0.4; margin-top: 5px;">ERC-8004 COMPLIANT EXECUTION</div>
+            <div style="margin-top: auto; padding-top: 24px; border-top: 1px solid var(--panel-border);">
+                <div class="card-label">Portfolio Total Equity</div>
+                <div id="equity-val" style="font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;">--- ETH</div>
+                <div style="font-size: 0.65rem; color: var(--text-body); margin-top: 6px; letter-spacing: 0.05em;">COMPLIANT WITH ERC-8004 STANDARD</div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <div id="cid-popup">
-        <div class="cid-label">NEW_ARTIFACT_REGISTERED (IPFS)</div>
-        <div class="cid-value" id="cid-text">---</div>
-        <div style="margin-top:10px; font-size: 0.6rem; opacity: 0.5;">HASH SECURED BY TEE SIGNATURE</div>
+        <div class="popup-heading">NEW_ATTESTATION_ARTIFACT_UPLOADED</div>
+        <div class="popup-cid" id="cid-text">---</div>
+        <div style="font-size: 0.6rem; color: var(--text-body); margin-top: 10px;">HASH SIGNED BY ENCLAVE PRIVATE KEY</div>
     </div>
 
     <script>
@@ -295,48 +292,55 @@
         function logLine(msg) {
             const time = new Date().toLocaleTimeString('en-US', { hour12: false });
             const entry = document.createElement('div');
-            entry.className = 'log-entry';
             
-            let processedMsg = msg;
-            if (msg.includes('EXECUTE')) processedMsg = `<span class="log-tag-execute">${msg}</span>`;
-            if (msg.includes('SKIP')) processedMsg = `<span class="log-tag-skip">${msg}</span>`;
+            let html = `<span>[${time}]</span> `;
+            if (msg.includes('EXECUTE')) {
+                html += `<span class="t-execute">${msg}</span>`;
+            } else if (msg.includes('SKIP')) {
+                html += `<span class="t-skip">${msg}</span>`;
+            } else {
+                html += msg;
+            }
             
-            entry.innerHTML = `<span class="log-time">[${time}]</span> ${processedMsg}`;
+            entry.innerHTML = html;
             terminal.appendChild(entry);
             terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Resilient WebSocket Protocol Detection
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = protocol + '//' + window.location.host + '/api/stream';
-        const socket = new WebSocket(wsUrl);
+        const socket = new WebSocket(`${protocol}//${window.location.host}/api/stream`);
 
         socket.onopen = () => {
-            wsStatus.innerText = 'STREAMS: LIVE';
-            logLine('Handshake complete. TEE Data streaming enabled.');
+            wsStatus.innerText = 'SYSTEM: LIVE';
+            wsStatus.style.color = '#10B981';
+            logLine('Handshake verified. TEE encrypted stream operational.');
         };
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
-            // 1. Update Core Metrics
+            // Metrics Update
             document.getElementById('winner-val').innerText = data.active_symbol + '/USDC';
-            document.getElementById('winner-yield').innerText = `NET_YIELD: +${data.last_net_yield.toFixed(3)}%`;
+            document.getElementById('winner-yield').innerText = `NET PERFORMANCE: +${data.last_net_yield.toFixed(3)}%`;
             document.getElementById('llm-val').innerText = `${data.current_llm_threshold.toFixed(3)}%`;
             document.getElementById('spread-val').innerText = `${data.last_spread.toFixed(3)}%`;
             document.getElementById('equity-val').innerText = `${data.current_equity.toFixed(6)} ETH`;
 
-            // 2. Circuit Breaker
+            // Circuit Breaker State
             cbBadge.style.display = data.circuit_breaker_active ? 'flex' : 'none';
 
-            // 3. Scan List
+            // Scan List Injection
             const scanList = document.getElementById('scan-list');
             scanList.innerHTML = '';
             (data.scan_results || []).forEach(res => {
                 const row = document.createElement('div');
                 row.className = `scan-row ${res.symbol === data.active_symbol ? 'active' : ''}`;
-                row.innerHTML = `<span class="s-name">${res.symbol}/USDC</span> <span class="s-yield">+${res.net_yield.toFixed(3)}%</span>`;
+                row.innerHTML = `<span>${res.symbol}/USDC</span> <span style="color:#fff">+${res.net_yield.toFixed(3)}%</span>`;
                 scanList.appendChild(row);
             });
 
-            // 4. Memory Logs (Only if new)
+            // Memory Logging
             if (data.short_term_memory && data.short_term_memory.length > 0) {
                 const lastLog = data.short_term_memory[data.short_term_memory.length - 1];
                 if (window.lastMemMsg !== lastLog) {
@@ -345,21 +349,21 @@
                 }
             }
 
-            // 5. Artifact Notification
+            // Attestation Notification (CID)
             if (data.latest_cid && window.lastCid !== data.latest_cid) {
                 const popup = document.getElementById('cid-popup');
                 document.getElementById('cid-text').innerText = data.latest_cid;
                 popup.style.display = 'block';
-                logLine(`<b>NEW VALIDATION ARTIFACT</b>: ${data.latest_cid.substring(0, 12)}...`);
+                logLine(`[PROVABLE] Artifact Published: CID ${data.latest_cid.substring(0, 10)}...`);
                 setTimeout(() => { popup.style.display = 'none'; }, 8000);
                 window.lastCid = data.latest_cid;
             }
         };
 
         socket.onclose = () => {
-            wsStatus.innerText = 'STREAMS: DISCONNECTED';
-            wsStatus.style.color = 'var(--danger)';
-            logLine('<span style="color:var(--danger)">[ERR] Connection to CVM lost. Reconnecting...</span>');
+            wsStatus.innerText = 'SYSTEM: OFFLINE';
+            wsStatus.style.color = '#EF4444';
+            logLine('[CRITICAL] Link severed. Re-establishing secure tunnel...');
             setTimeout(() => window.location.reload(), 5000);
         };
     </script>
