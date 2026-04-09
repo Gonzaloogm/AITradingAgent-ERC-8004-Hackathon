@@ -5,7 +5,7 @@ const PHALA_URL = 'https://d571a329e5081e0d1b8fd65773ba0cd84e9e3457-8000.dstack-
 
 export class APIClient {
   constructor() {
-    this.baseURL = window.location.hostname === 'localhost' ? PHALA_URL : '';
+    this.baseURL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
   }
 
   async request(endpoint, options = {}) {

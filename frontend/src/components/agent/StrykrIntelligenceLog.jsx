@@ -97,5 +97,3 @@ export default function StrykrIntelligenceLog({ scanResults, activeSymbol, logs 
     </div>
   );
 }
-  );
-}
