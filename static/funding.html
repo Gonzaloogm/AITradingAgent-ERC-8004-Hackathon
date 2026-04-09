@@ -304,10 +304,9 @@
             entry.innerHTML = `<span class="log-time">[${time}]</span> ${processedMsg}`;
             terminal.appendChild(entry);
             terminal.scrollTop = terminal.scrollHeight;
-        }
-
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const socket = new WebSocket(`${wsProtocol}//${window.location.host}/api/stream`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/api/stream';
+        const socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
             wsStatus.innerText = 'STREAMS: LIVE';

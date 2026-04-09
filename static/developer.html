@@ -188,7 +188,9 @@
 
     <script>
         const terminal = document.getElementById('terminal');
-        const ws = const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; const socket = new WebSocket(`${wsProtocol}//${window.location.host}/api/stream`);
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = protocol + '//' + window.location.host + '/api/stream';
+        const ws = new WebSocket(wsUrl);
 
         function logToTerminal(msg) {
             const time = new Date().toLocaleTimeString();
