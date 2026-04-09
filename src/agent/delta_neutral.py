@@ -65,10 +65,13 @@ class DeltaNeutralEngine:
 
         print("[INFO] Initializing secure TEE environment...")
         private_key = os.getenv("PRIVATE_KEY")
+        
+        # Fallback for mock mode if PRIVATE_KEY is missing
         if not private_key:
-            raise EnvironmentError(
-                "PRIVATE_KEY is not defined in the project .env file."
-            )
+            salt = os.getenv("AGENT_SALT", "default_salt")
+            print(f"[INFO] No PRIVATE_KEY found. Generating demo identity from salt: {salt}")
+            private_key = "0x" + Web3.keccak(text=f"demo-key-{salt}").hex()
+
         self.tee_auth = TEEAuthenticator(
             domain="localhost:8000",
             salt=os.getenv("AGENT_SALT", "default_salt"),

@@ -1,15 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '../hooks/useWallet';
-import { useToast } from '../components/ui/Toast';
-import { apiClient } from '../api/client';
 import { useAgentStatus } from '../hooks/useAgentStatus';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import PnLChart from '../components/agent/PnLChart';
 import { Clipboard, Check, Activity, ShieldCheck, BarChart3, Terminal as TerminalIcon, Gauge, Zap, Lock } from 'lucide-react';
 
 const DashboardCard = ({ title, children, badge = "TEE VERIFIED", icon: Icon, highlight = false }) => (
-  <div className={\`bg-[#0A0D14] border \${highlight ? 'border-[#00FF00]/40' : 'border-white/5'} rounded-2xl p-6 flex flex-col h-full relative overflow-hidden group hover:border-[#00FF00]/20 transition-all duration-500 shadow-2xl\`}>
+  <div className={`bg-[#0A0D14] border ${highlight ? 'border-[#00FF00]/40' : 'border-white/5'} rounded-2xl p-6 flex flex-col h-full relative overflow-hidden group hover:border-[#00FF00]/20 transition-all duration-500 shadow-2xl`}>
     <div className="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
       {Icon && <Icon size={40} className="text-gray-500" />}
     </div>
@@ -29,12 +26,10 @@ const DashboardCard = ({ title, children, badge = "TEE VERIFIED", icon: Icon, hi
 );
 
 export default function DashboardPage() {
-  const navigate = useNavigate();
-  const toast = useToast();
-  const { wallet, loading: walletLoading, error: walletError, formattedBalance, isFunded } = useWallet(5000);
+  const { formattedBalance } = useWallet(5000);
 
   const [agentReady, setAgentReady] = useState(false);
-  const [agentId, setAgentId] = useState("AGENT-4108-TDX");
+  const [agentId] = useState("AGENT-4108-TDX");
   const [simPnL, setSimPnL] = useState(0.004245); 
   const [pnlHistory, setPnlHistory] = useState([{ time: 'Initial', value: 0.004245 }]);
   const [copied, setCopied] = useState(false);
@@ -92,8 +87,9 @@ export default function DashboardPage() {
 
     const connect = () => {
       if (!agentReady) return;
-      const host = window.location.hostname === 'localhost' ? 'd571a329e5081e0d1b8fd65773ba0cd84e9e3457-8000.dstack-pha-prod9.phala.network' : window.location.host;
-      const wsUrl = \`wss://\${host}/api/stream\`;
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const host = isDev ? 'localhost:8000' : window.location.host;
+      const wsUrl = `wss://${host}/api/stream`;
       ws = new WebSocket(wsUrl);
        
       ws.onopen = () => {
@@ -130,10 +126,9 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (walletLoading || statusLoading) {
+  if (statusLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#05070A] text-[#00FF00]">
-        <style>{\`@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap');\`}</style>
         <LoadingSpinner size="lg" />
         <p className="mt-6 font-mono text-[10px] tracking-[0.5em] animate-pulse uppercase">Initializing Secure TEE Hub...</p>
       </div>
@@ -141,13 +136,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#05070A] text-gray-300 p-8 font-['Roboto_Mono',_monospace]">
-      <style>{\`
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap');
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      \`}</style>
-
+    <div className="min-h-screen bg-[#05070A] text-gray-300 p-8 font-mono">
       {/* HEADER */}
       <div className="flex flex-col lg:flex-row justify-between items-center mb-10 px-6 py-8 bg-[#0A0D14] border border-white/5 rounded-3xl shadow-inner relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00FF00]/20 to-transparent" />
@@ -161,7 +150,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-10 mt-6 lg:mt-0">
           <div className="flex flex-col items-end">
             <span className="text-[9px] text-gray-600 uppercase tracking-widest">Enclave Identity</span>
-            <span className="text-sm font-black text-white">{String(agentId || '4108').includes('AGENT') ? agentId : \`AGENT-\${String(agentId || '0000').slice(0, 4)}-TDX\`}</span>
+            <span className="text-sm font-black text-white">{String(agentId || '4108').includes('AGENT') ? agentId : `AGENT-${String(agentId || '0000').slice(0, 4)}-TDX`}</span>
           </div>
           <div className="h-10 w-[1px] bg-white/5" />
           <div className="flex flex-col items-end">
@@ -181,13 +170,13 @@ export default function DashboardPage() {
               <div className="flex flex-col">
                 <span className="text-[8px] text-gray-600 uppercase mb-1">Kraken Spot</span>
                 <span className="text-2xl font-black text-white tracking-tighter">
-                  \${agentState.last_spot_price?.toLocaleString(undefined, {minimumFractionDigits: 1})}
+                  ${agentState.last_spot_price?.toLocaleString(undefined, {minimumFractionDigits: 1})}
                 </span>
               </div>
               <div className="flex flex-col">
                 <span className="text-[8px] text-gray-600 uppercase mb-1">dYdX Perp</span>
                 <span className="text-2xl font-black text-white tracking-tighter">
-                  \${agentState.last_perp_price?.toLocaleString(undefined, {minimumFractionDigits: 1})}
+                  ${agentState.last_perp_price?.toLocaleString(undefined, {minimumFractionDigits: 1})}
                 </span>
               </div>
             </div>

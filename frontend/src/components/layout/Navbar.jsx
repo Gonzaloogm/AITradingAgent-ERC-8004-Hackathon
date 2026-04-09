@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAgentStatus } from '../../hooks/useAgentStatus';
 import { formatAddress } from '../../utils/formatters';
 
@@ -11,7 +11,6 @@ const navLinks = [
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { status } = useAgentStatus(20000);
-  const location = useLocation();
 
   const isOnline = !!status;
   const isRegistered = status?.agent?.is_registered;
