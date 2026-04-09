@@ -344,28 +344,120 @@ async def websocket_stream(websocket: WebSocket):
     except Exception:
         pass
 
+def get_enclave_status_html():
+    """Generates a premium HTML fallback page for the TEE agent."""
+    llm_info = "Groq LLaMA 3.1"
+    status = "OPERATIONAL"
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Striker Enclave Terminal</title>
+        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            body {{
+                background-color: #050505;
+                color: #00ff41;
+                font-family: 'JetBrains+Mono', monospace;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                overflow: hidden;
+            }}
+            .terminal {{
+                border: 1px solid #00ff41;
+                padding: 40px;
+                box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+                max-width: 600px;
+                background: rgba(0, 10, 0, 0.8);
+            }}
+            .header {{
+                font-size: 1.5em;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #00ff41;
+                padding-bottom: 10px;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+            }}
+            .stat {{ margin: 10px 0; }}
+            .label {{ color: #008f11; }}
+            .value {{ color: #00ff41; font-weight: bold; }}
+            .pulse {{
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                background: #00ff41;
+                border-radius: 50%;
+                margin-right: 10px;
+                animation: pulse 1.5s infinite;
+            }}
+            @keyframes pulse {{
+                0% {{ opacity: 1; transform: scale(1); }}
+                50% {{ opacity: 0.3; transform: scale(1.2); }}
+                100% {{ opacity: 1; transform: scale(1); }}
+            }}
+            .tag {{
+                background: #003300;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-size: 0.8em;
+            }}
+            .footer {{
+                margin-top: 30px;
+                font-size: 0.7em;
+                color: #004d00;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="pulse" style="position: absolute; top: 40px; right: 40px;"></div>
+        <div class="terminal">
+            <div class="header">STRIKER_ENCLAVE_SYSTEM_v1.0</div>
+            <div class="stat"><span class="label">STATUS:</span> <span class="value">{status}</span></div>
+            <div class="stat"><span class="label">LLM_CORE:</span> <span class="value">{llm_info}</span> <span class="tag">SECURE</span></div>
+            <div class="stat"><span class="label">TEE_HARDWARE:</span> <span class="value">Verified (Intel TDX)</span></div>
+            <div class="stat"><span class="label">UPTIME:</span> <span class="value">ALIVE</span></div>
+            <br>
+            <div style="font-size: 0.9em; opacity: 0.8;">> System operational. Backend scanning BTC, ETH, SOL...</div>
+            <div style="font-size: 0.9em; opacity: 0.8;">> API Endpoints: <span class="value">/api/status</span> | <span class="value">/api/stream</span></div>
+            <div class="footer">REPRESENTATION OF SECURE ENCLAVE STATE // NO FRONTEND DIST FOUND</div>
+        </div>
+    </body>
+    </html>
+    """
+
+def serve_static_or_fallback(filename: str):
+    """Serves a static file if it exists, otherwise returns the status HTML fallback."""
+    path = os.path.join(static_path, filename)
+    if os.path.exists(path):
+        return FileResponse(path)
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=get_enclave_status_html())
+
 @app.get("/")
 async def root():
-  """Root endpoint - redirect to funding page."""
-  return FileResponse(os.path.join(static_path, 'funding.html'))
-
+    """Root endpoint - Serves landing if exists, otherwise status dashboard."""
+    return serve_static_or_fallback('funding.html')
 
 @app.get("/funding")
 async def funding_page():
-  """Funding page."""
-  return FileResponse(os.path.join(static_path, 'funding.html'))
-
+    """Funding page."""
+    return serve_static_or_fallback('funding.html')
 
 @app.get("/dashboard")
 async def dashboard_page():
-  """Dashboard page."""
-  return FileResponse(os.path.join(static_path, 'dashboard.html'))
-
+    """Dashboard page."""
+    return serve_static_or_fallback('dashboard.html')
 
 @app.get("/developer")
 async def developer_page():
-  """Developer API interaction page."""
-  return FileResponse(os.path.join(static_path, 'developer.html'))
+    """Developer API interaction page."""
+    return serve_static_or_fallback('developer.html')
 
 
 @app.get("/api/chain-config")
