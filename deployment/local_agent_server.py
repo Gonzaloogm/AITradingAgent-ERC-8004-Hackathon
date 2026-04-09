@@ -622,8 +622,7 @@ async def get_status():
           "chain_id": agent.config.chain_id
       },
       "tee": {
-          "enabled": True,
-          #"endpoint": tee_auth.tee_endpoint if tee_auth else None
+          "enabled": getattr(tee_auth, 'use_tee', False),
           "endpoint": getattr(tee_auth, 'tee_endpoint', None)
       },
       "timestamp": datetime.utcnow().isoformat()
