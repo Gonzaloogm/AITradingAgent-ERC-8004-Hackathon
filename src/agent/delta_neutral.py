@@ -28,6 +28,7 @@ class DeltaNeutralEngine:
         self.last_price = None                # Tracks the previous spot price for swing detection
         self.last_llm_threshold: Optional[float] = None # Tracks the most recent AI risk limit
         self.short_term_memory: list = []     # Rolling 5-entry log of recent tick decisions
+        self.is_activated = False             # Logic gate: waits for TEE registration + funds
 
         # ------------------------------------------------------------------
         # REAL-TIME METRICS CACHE (For Dashboard WebSocket Streaming)
@@ -704,9 +705,27 @@ Respond ONLY with a valid JSON object, no extra text:
 
     async def run_loop(self):
         print("[INFO] Starting Global Delta-Neutral Engine (Strykr Intelligence Pack)")
+        
+        # --- Standby Phase: Wait for registration and funding ---
+        while not self.is_activated:
+            msg = "[STRATEGY] Standby: Waiting for TEE registration & funding..."
+            if not self.short_term_memory or self.short_term_memory[-1] != msg:
+                print(msg)
+                self.short_term_memory.append(msg)
+                if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
+            await asyncio.sleep(5)
+
+        print("[STRATEGY] Core activated. Starting scanning loop...")
+        self.short_term_memory.append("[STRATEGY] Enclave Core activated. Initiating market scan.")
+        if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
+
         while self.is_running:
             try:
                 # --- Step 1: Multi-Asset Market Scan ---
+                print("[STRATEGY] Scanning for spreads (BTC, ETH, SOL)...")
+                self.short_term_memory.append("[STRATEGY] Scanning for BTC/USDC spread....")
+                if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
+
                 symbols = ["BTC", "ETH", "SOL"]
                 scan_results = await self.scanner.get_batch_spreads(symbols)
                 self._last_scan_results = scan_results

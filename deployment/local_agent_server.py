@@ -12,6 +12,7 @@ import sys
 import os
 import asyncio
 import json
+import time
 from dotenv import load_dotenv
 
 # Explicitly load .env from the project root (one level up from deployment/)
@@ -302,6 +303,34 @@ async def startup_event():
   trading_engine = DeltaNeutralEngine()
   asyncio.create_task(trading_engine.run_loop())
 
+  # Background task to monitor and auto-activate strategy
+  async def monitor_activation():
+      while not trading_engine.is_activated:
+          try:
+              # Check balance
+              agent_address = await agent._get_agent_address()
+              balance_wei = agent._registry_client.w3.eth.get_balance(agent_address)
+              balance_eth = float(agent._registry_client.w3.from_wei(balance_wei, 'ether'))
+              
+              # Check registration via fast path
+              is_reg = getattr(agent, 'is_registered', False)
+              
+              if is_reg and balance_eth > 0:
+                  print(f"\n[AUTO-ACTIVATE] Conditions met! Balance: {balance_eth} ETH | Registered: TRUE")
+                  trading_engine.is_activated = True
+                  break
+              
+              # Log standby status every 30s
+              if int(time.time()) % 30 < 5:
+                  print(f"[AUTO-ACTIVATOR] Standby... (Reg: {is_reg}, Balance: {balance_eth} ETH)")
+                  
+          except Exception as e:
+              print(f"[AUTO-ACTIVATOR] Error: {e}")
+          
+          await asyncio.sleep(5)
+
+  asyncio.create_task(monitor_activation())
+
 
 @app.get("/api/agent-state")
 async def get_agent_state():
@@ -311,6 +340,7 @@ async def get_agent_state():
 
     return {
         "status": "running" if trading_engine.is_running else "halted",
+        "is_activated": trading_engine.is_activated,
         "current_llm_threshold": trading_engine.last_llm_threshold or 0.075,
         "last_spread": getattr(trading_engine, "_last_spread_pct", -0.05),
         "circuit_breaker_active": trading_engine.circuit_breaker_tripped,
