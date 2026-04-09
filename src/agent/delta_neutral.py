@@ -88,8 +88,8 @@ class DeltaNeutralEngine:
             api_key=api_key or "no-key",
             base_url=base_url,
         )
-        # Standard model for Groq: llama3-70b-8192
-        self.llm_model = os.getenv("LLM_MODEL", "llama3-70b-8192")
+        # Standard model for Groq: llama-3.1-8b-instant (stable)
+        self.llm_model = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
         
         # ------------------------------------------------------------------
         # TRADING SYMBOLS (Dynamic for swarm deployment)
@@ -364,8 +364,14 @@ Respond ONLY with a valid JSON object, no extra text:
                       f"(current spread: {spread_pct:.4f}%)")
                 return threshold
 
+            except openai.BadRequestError as e:
+                print(f"[CRITICAL] Groq API 400 Bad Request: {e}")
+                if hasattr(e, "response"):
+                    print(f"DEBUG: API Response -> {e.response.text}")
+                # Don't waste retries on 400 errors (usually model/config issues)
+                break
             except Exception as e:
-                print(f"[WARN] LLM call failed formatting or timed out ({e}).")
+                print(f"[WARN] LLM call failed formatting or timed out ({type(e).__name__}: {e}).")
                 if attempt < max_retries - 1:
                     backoff = 2 ** attempt
                     print(f"[INFO] Retrying LLM in {backoff} seconds...")
