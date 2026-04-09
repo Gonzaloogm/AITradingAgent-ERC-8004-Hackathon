@@ -1,36 +1,23 @@
 services:
   agent:
-    # Nombre corto y simple
     image: ubuntu:22.04
-    platform: linux/amd64
-    # Eliminado container_name y x-phala (Phala Cloud los gestiona internamente)
+    platform: linux/amd64 # CRÍTICO: Fuerza arquitectura Intel para Phala TDX
     environment:
       - GITHUB_REPO=${GITHUB_REPO}
       - GIT_COMMIT_HASH=${GIT_COMMIT_HASH:-main}
-      - UPDATE_CODE=${UPDATE_CODE:-true}
+      - UPDATE_CODE=true
       - AGENT_SALT=${AGENT_SALT}
       - RPC_URL=${RPC_URL}
       - CHAIN_ID=${CHAIN_ID}
-      - PRISM_API_KEY=${PRISM_API_KEY}
-      - AGENT_PORT=80
-      - AGENT_HOST=0.0.0.0
-    volumes:
-      - app_data:/app
-      # Socket de dstack eliminado para evitar el error 400 en CVMs estándar
+      - REDPILL_API_KEY=${REDPILL_API_KEY}
     ports:
       - "80:80"
-    restart: unless-stopped
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        apt-get update && apt-get install -y git python3 python3-pip &&
+        apt-get update && apt-get install -y git python3 python3-pip curl &&
         mkdir -p /app && cd /app &&
-        if [ "$$UPDATE_CODE" = "true" ] || [ ! -d ".git" ]; then
-          git clone $$GITHUB_REPO . && git checkout $$GIT_COMMIT_HASH;
-        fi &&
+        git clone $$GITHUB_REPO . &&
         pip3 install -r requirements.txt &&
         exec bash entrypoint.sh
-
-volumes:
-  app_data:

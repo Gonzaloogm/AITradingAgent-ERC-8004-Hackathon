@@ -71,12 +71,13 @@ class DeltaNeutralEngine:
         )
 
         # ------------------------------------------------------------------
-        # LLM CLIENT  (free OpenAI-compatible endpoint, e.g. AI/ML API, OpenRouter)
+        # LLM ADAPTIVE RISK ANALYZER (OpenRouter / RedPill)
         # ------------------------------------------------------------------
-        api_key = os.getenv("FREE_LLM_API_KEY")
-        base_url = os.getenv("LLM_BASE_URL", "https://api.aimlapi.com/v1")
+        api_key  = os.getenv("REDPILL_API_KEY") or os.getenv("FREE_LLM_API_KEY")
+        base_url = os.getenv("FREE_LLM_BASE_URL", "https://openrouter.ai/api/v1")
+        
         if not api_key:
-            print("[WARN] FREE_LLM_API_KEY not defined. "
+            print("[WARN] No LLM API Key (REDPILL_API_KEY / FREE_LLM_API_KEY) found. "
                   "LLM will use the default threshold each tick.")
         self.llm_client = openai.AsyncOpenAI(
             api_key=api_key or "no-key",
