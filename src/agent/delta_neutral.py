@@ -1,12 +1,13 @@
 import asyncio
 import json
+# STRIKER: Optimized Trade Engine (Gemini 1.5 Flash)
 import subprocess
 import time
 
 import os
 import sys
 import requests
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from eth_account.messages import encode_typed_data
 from web3.auto import w3
@@ -21,11 +22,41 @@ import collections
 from typing import Dict, Any, Optional
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from tee_auth import TEEAuthenticator
+from base import BaseAgent, AgentRole, AgentConfig, RegistryAddresses
 from data_provider import MarketScanner
 
-class DeltaNeutralEngine:
-    def __init__(self):
+
+class DeltaNeutralEngine(BaseAgent):
+    def __init__(self, config: Optional[AgentConfig] = None, registries: Optional[RegistryAddresses] = None):
+        # ------------------------------------------------------------------
+        # HACKATHON STANDALONE MODE: Auto-config if not provided
+        # ------------------------------------------------------------------
+        if config is None:
+            # Check if we are in a TEE enclave (socket exists)
+            dstack_socket = "/var/run/dstack.sock"
+            use_tee = os.path.exists(dstack_socket) or os.getenv("ALLOW_TEE_MOCK") == "true"
+            
+            if not os.path.exists(dstack_socket) and os.getenv("ALLOW_TEE_MOCK") != "true":
+                print("[WARN] No TEE device found. Booting in MOCK mode (ALLOW_TEE_MOCK=true).")
+                use_tee = False
+
+            config = AgentConfig(
+                domain=os.getenv("AGENT_DOMAIN", "localhost:8000"),
+                salt=os.getenv("AGENT_SALT", "SentinelProX"),
+                role=AgentRole.SERVER,
+                rpc_url=os.getenv("RPC_URL", "https://sepolia.base.org"),
+                chain_id=int(os.getenv("CHAIN_ID", "84532")),
+                use_tee_auth=use_tee,
+                private_key=os.getenv("PRIVATE_KEY")
+            )
+        
+        if registries is None:
+            registries = RegistryAddresses(
+                identity=os.getenv("IDENTITY_REGISTRY", "0x8004A818BFB912233c491871b3d84c89A494BD9e"),
+                reputation=os.getenv("REPUTATION_REGISTRY", "0x8004B663056A597Dffe9eCcC1965A193B7388713")
+            )
+
+        super().__init__(config, registries)
         self.is_running = True
         self.circuit_breaker_tripped = False  # Safety flag -- halts trading on extreme volatility
         self.last_price = None                # Tracks the previous spot price for swing detection
@@ -64,21 +95,7 @@ class DeltaNeutralEngine:
         self.max_allowable_drawdown = 0.05   # 5% maximum drawdown from peak
         self.min_activation_balance = 0.001  # Lowered to 0.001 ETH for demo
 
-        print("[INFO] Initializing secure TEE environment...")
-        private_key = os.getenv("PRIVATE_KEY")
-        
-        # Fallback for mock mode if PRIVATE_KEY is missing
-        if not private_key:
-            salt = os.getenv("AGENT_SALT", "default_salt")
-            print(f"[INFO] No PRIVATE_KEY found. Generating demo identity from salt: {salt}")
-            private_key = "0x" + Web3.keccak(text=f"demo-key-{salt}").hex()
-
-        self.tee_auth = TEEAuthenticator(
-            domain="localhost:8000",
-            salt=os.getenv("AGENT_SALT", "default_salt"),
-            use_tee=False,
-            private_key=private_key
-        )
+        # REDUNDANT INITIALIZATION REMOVED: Handled by BaseAgent superclass.
 
         # ------------------------------------------------------------------
         # LLM ADAPTIVE RISK ANALYZER (Gemini 1.5 Flash Migration)
@@ -87,13 +104,12 @@ class DeltaNeutralEngine:
         
         if not gemini_key:
             print("[WARN] No GEMINI_API_KEY found. LLM will use the default threshold each tick.")
-            self.model = None
+            self.ai_client = None
         else:
-            genai.configure(api_key=gemini_key)
-            # Standard model for speed: gemini-1.5-flash
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.ai_client = genai.Client(api_key=gemini_key)
+            # Standard model for speed: gemini-2.0-flash
         
-        self.llm_model = "gemini-1.5-flash"
+        self.llm_model = "models/gemini-2.0-flash"
         
         # ------------------------------------------------------------------
         # TRADING SYMBOLS (Dynamic for swarm deployment)
@@ -102,6 +118,33 @@ class DeltaNeutralEngine:
         self.symbol_market = os.getenv("TRADING_SYMBOL_MARKET", "BTC/USDC") # e.g., ETH/USDC
         
         self.log("[INFO] Delta Neutral Engine initialized and ready.")
+
+    async def process_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process incoming tasks. For STRIKER, this mostly handles 
+        manual rebalancing requests or parameter updates.
+        """
+        action = task_data.get("action")
+        if action == "status":
+            return self.get_status()
+        return {"status": "task_received", "action": action}
+
+    async def _create_agent_card(self) -> Dict[str, Any]:
+        """
+        Create the ERC-8004 Agent Card identifying STRIKER capabilities.
+        """
+        agent_address = await self._get_agent_address()
+        return {
+            "name": "STRIKER Institutional Delta-Neutral Agent",
+            "version": "1.0.0",
+            "description": "High-frequency delta-neutral yield optimizer running in Intel TDX.",
+            "capabilities": ["delta_neutral", "prism_scan", "llm_risk_audit"],
+            "endpoints": {
+                "api": f"https://{self.config.domain}",
+                "websocket": f"wss://{self.config.domain}/ws"
+            },
+            "address": agent_address
+        }
 
     def log(self, message: str):
         """Prints to console and buffers for the WebSocket stream."""
@@ -270,7 +313,7 @@ class DeltaNeutralEngine:
             if not w3_client.is_connected():
                 raise ConnectionError("RPC not reachable")
 
-            wallet_address = w3_client.to_checksum_address(self.tee_auth.address)
+            wallet_address = w3_client.to_checksum_address(self._tee_auth.address)
             balance_wei = w3_client.eth.get_balance(wallet_address)
             balance_eth = w3_client.from_wei(balance_wei, "ether")
 
@@ -302,7 +345,7 @@ class DeltaNeutralEngine:
             required_spread_threshold (float, clamped to [0.015, 0.20] percent).
         """
         # --- FAST FALLBACK FOR DEMO STABILITY ---
-        if not self.model:
+        if not self.ai_client:
             return 0.1 # Default 0.1% threshold
 
         spread_pct = ((perp_price - spot_price) / spot_price) * 100
@@ -319,16 +362,17 @@ class DeltaNeutralEngine:
             try:
                 self.log("[INTEL] Querying Gemini Ultra-Fast Flash for risk assessment...")
 
-                # Hard timeout of 1.0s for Hackathon speed
+                # Hard timeout of 4.0s for reliable response
                 response = await asyncio.wait_for(
-                    self.model.generate_content_async(
-                        prompt,
-                        generation_config=genai.types.GenerationConfig(
-                            temperature=0.1,
-                            max_output_tokens=100,
-                        )
+                    self.ai_client.aio.models.generate_content(
+                        model=self.llm_model,
+                        contents=prompt,
+                        config={
+                            'temperature': 0.1,
+                            'max_output_tokens': 100,
+                        }
                     ),
-                    timeout=1.0
+                    timeout=4.0
                 )
                 
                 raw = response.text.strip()
@@ -416,7 +460,7 @@ class DeltaNeutralEngine:
                       f"{trade_size_eth:.6f} ETH  ->  {trade_amount_wei} Wei (uint256)")
 
                 self.create_trade_intent("LONG_SPOT_SHORT_PERP", self.active_symbol, trade_amount_wei)
-                self.is_running = False
+                # self.is_running = False  <-- Removed for continuous daemon mode
             finally:
                 # Schedule flag reset
                 import asyncio
@@ -616,7 +660,7 @@ class DeltaNeutralEngine:
 
         signed_intent = w3.eth.account.sign_message(
             signable_message,
-            private_key=self.tee_auth.private_key
+            private_key=self._tee_auth.private_key
         )
 
         print("[OK] TradeIntent signed successfully.")
@@ -676,7 +720,7 @@ class DeltaNeutralEngine:
             router_contract = w3_client.eth.contract(address=risk_router_address, abi=risk_router_abi)
 
             # 3. Prepare transaction data (TEE wallet pays gas)
-            wallet_address = w3_client.to_checksum_address(self.tee_auth.address)
+            wallet_address = w3_client.to_checksum_address(self._tee_auth.address)
             nonce = w3_client.eth.get_transaction_count(wallet_address)
 
             print("[INFO] Building transaction for the EVM...")
@@ -703,7 +747,7 @@ class DeltaNeutralEngine:
             })
 
             # 4. Sign the transaction with the isolated TEE key
-            signed_tx = w3_client.eth.account.sign_transaction(tx, private_key=self.tee_auth.private_key)
+            signed_tx = w3_client.eth.account.sign_transaction(tx, private_key=self._tee_auth.private_key)
 
             print("[OK] Transaction built and signed. Ready for broadcast.")
 
@@ -826,13 +870,26 @@ class DeltaNeutralEngine:
                 else:
                     print(f"[INFO] No assets met the minimum threshold ({final_threshold}%).")
 
-                # Professionalized loop delay
-                await asyncio.sleep(5)
+                # Lead Developer Requirement: 10s delay between scan cycles
+                print("\033[93m[SYSTEM] Cycle complete. Entering active standby (10s)...\033[0m")
+                await asyncio.sleep(10)
 
             except Exception as e:
-                print(f"[CRITICAL] Unhandled global exception in run_loop: {e}. Surviving...")
-                await asyncio.sleep(5)
+                # Print in red using ANSI codes
+                print(f"\033[91m[WARN] Cycle failed: {e}. Retrying in 10s...\033[0m")
+                await asyncio.sleep(10)
 
 if __name__ == "__main__":
-    engine = DeltaNeutralEngine()
-    asyncio.run(engine.run_loop())
+    import time
+    while True:
+        try:
+            # Standard STRIKER Startup (Detects environment automatically)
+            engine = DeltaNeutralEngine()
+            asyncio.run(engine.run_loop())
+            print("\033[93m[SYSTEM] Cycle complete. Entering active standby (10s)...\033[0m")
+        except Exception as e:
+            # Print in red using ANSI codes
+            print(f"\033[91m[WARN] Cycle failed: {e}. Retrying in 10s...\033[0m")
+        
+        # Pause for 10s before next scan cycle to respect rate limits
+        time.sleep(10)

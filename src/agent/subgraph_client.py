@@ -14,7 +14,7 @@ from gql import gql, Client
 from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.exceptions import TransportQueryError
 
-from .chain_config import ChainConfig, get_chain_config_from_env, get_subgraph_url
+from chain_config import ChainConfig, get_chain_config_from_env, get_subgraph_url
 
 
 @dataclass

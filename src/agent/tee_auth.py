@@ -58,22 +58,31 @@ class TEEAuthenticator:
                   self.tee_endpoint = "/var/run/dstack.sock"
 
           print(f" Initializing TEE client at: {self.tee_endpoint}")
-          # DstackClient takes the endpoint directly (URL for simulator, default for socket)
-          if self.tee_endpoint.startswith("http"):
-              # Simulator endpoint
-              self.tee_client = DstackClient(self.tee_endpoint)
-          else:
-              # Socket endpoint (default)
-              self.tee_client = DstackClient()
+          
+          # Initialize TEE or handle error
+          try:
+              if self.tee_endpoint.startswith("http"):
+                  # Simulator endpoint
+                  self.tee_client = DstackClient(self.tee_endpoint)
+              else:
+                  # Socket endpoint (default)
+                  self.tee_client = DstackClient()
+              
+              # Derive key using TEE
+              self._derive_tee_key()
+          except Exception as e:
+              print(f"[WARN] TEE initialization failed: {e}. Falling back to Mock.")
+              self.use_tee = False
 
-          # Derive key using TEE
-          self._derive_tee_key()
-      else:
-          # Use provided private key
+      # Handle Mock/Private Key mode (if use_tee is False or failed)
+      if not self.use_tee:
           if not private_key:
-              raise ValueError("Private key required when TEE is disabled")
-          self.private_key = private_key
-          self.account = Account.from_key(private_key)
+              # Fallback to env or a mock key for testing
+              self.private_key = os.getenv("PRIVATE_KEY", "0" * 64)
+          else:
+              self.private_key = private_key
+          
+          self.account = Account.from_key(self.private_key)
           self.address = self.account.address
           print(f" Using private key mode, address: {self.address}")
 

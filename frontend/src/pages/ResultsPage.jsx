@@ -1,39 +1,74 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAgentStatus } from '../hooks/useAgentStatus';
 import { useWallet } from '../hooks/useWallet';
+import { apiClient } from '../api/client';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Activity, Terminal as TerminalIcon, Gauge, Play, ShieldAlert } from 'lucide-react';
+import { Activity, Terminal as TerminalIcon, Gauge, Play, Square, ShieldAlert } from 'lucide-react';
 
 export default function ResultsPage() {
   const { status, loading: statusLoading } = useAgentStatus(5000);
-  const { formattedBalance } = useWallet(5000);
+  const { marginReady, refetch: refetchWallet } = useWallet(5000);
   const [terminalLogs, setTerminalLogs] = useState([]);
-  const [isOperational, setIsOperational] = useState(localStorage.getItem('DEMO_OPERATIONAL') === 'true');
+  const [isOperational, setIsOperational] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const terminalRef = useRef(null);
 
-  const canStart = parseFloat(formattedBalance || '0') > 0;
+  // Sync isOperational with global status
+  useEffect(() => {
+    if (status?.status === 'running' || status?.is_activated) {
+        setIsOperational(true);
+    } else {
+        setIsOperational(false);
+    }
+  }, [status]);
 
-  const handleStart = () => {
-    localStorage.setItem('DEMO_OPERATIONAL', 'true');
-    setIsOperational(true);
-    window.dispatchEvent(new Event('storage'));
+  // WebSocket for Live Logs
+  useEffect(() => {
+    let ws = null;
+    const connect = () => {
+      const isDev = window.location.hostname === 'localhost';
+      const host = isDev ? 'localhost:8000' : window.location.host;
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${host}/api/stream`;
+      
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.logs) {
+            setTerminalLogs(data.logs);
+          }
+          setIsOperational(data.status === 'running');
+        } catch (err) {}
+      };
+      ws.onclose = () => setTimeout(connect, 3000);
+    };
+
+    connect();
+    return () => ws && ws.close();
+  }, []);
+
+  const handleStart = async () => {
+    setIsStarting(true);
+    const res = await apiClient.startStrategy();
+    if (res.success) {
+      setIsOperational(true);
+      refetchWallet();
+    }
+    setIsStarting(false);
+  };
+
+  const handleStop = async () => {
+    const res = await apiClient.stopStrategy();
+    if (res.success) {
+      setIsOperational(false);
+    }
   };
 
   useEffect(() => {
-    if (terminalRef?.current) terminalRef.current.scrollTo({ top: terminalRef.current.scrollHeight, behavior: 'smooth' });
+    if (terminalRef?.current) {
+        terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
   }, [terminalLogs]);
-
-  useEffect(() => {
-    if (isOperational && status?.agent?.short_term_memory) setTerminalLogs(status.agent.short_term_memory);
-  }, [status, isOperational]);
-
-  useEffect(() => {
-    if (isOperational) return;
-    const interval = setInterval(() => {
-      setTerminalLogs(prev => [ ...prev.slice(-15), `[IDLE] ${new Date().toLocaleTimeString()} - Awaiting liquidity in Enclave...` ]);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [isOperational]);
 
   if (statusLoading) {
     return (
@@ -59,18 +94,26 @@ export default function ResultsPage() {
         </div>
         
         <div className="flex items-center gap-10 mt-6 lg:mt-0">
-          {!isOperational && (
+          {!isOperational ? (
             <button
               onClick={handleStart}
-              disabled={!canStart}
+              disabled={!marginReady || isStarting}
               className={`flex items-center gap-2 px-8 py-3.5 rounded text-[10px] font-bold uppercase tracking-widest transition-all ${
-                canStart 
+                marginReady 
                   ? 'bg-gradient-to-r from-[#0091EA] to-[#00BFA5] text-white shadow-xl shadow-cyan-500/10 active:scale-95' 
                   : 'bg-white/5 text-slate-600 border border-white/5 cursor-not-allowed opacity-40'
               }`}
             >
-              <Play size={14} fill={canStart ? "white" : "none"} />
-              {canStart ? 'Initiate Enclave Rails' : 'Awaiting Injection'}
+              {isStarting ? <LoadingSpinner size="sm" /> : <Play size={14} fill={marginReady ? "white" : "none"} />}
+              {marginReady ? 'Initiate Enclave Rails' : '[WAITING MARGIN]'}
+            </button>
+          ) : (
+            <button
+              onClick={handleStop}
+              className="flex items-center gap-2 px-8 py-3.5 rounded text-[10px] font-bold uppercase tracking-widest transition-all bg-rose-600/20 text-rose-500 border border-rose-500/30 hover:bg-rose-600/30 active:scale-95"
+            >
+              <Square size={14} fill="currentColor" />
+              Terminate Strategy
             </button>
           )}
 
@@ -103,17 +146,17 @@ export default function ResultsPage() {
                 <TerminalIcon size={16} className="text-[#0091EA]" />
                 <span className="text-xs font-bold text-white uppercase tracking-widest">Enclave Execution Trace</span>
              </div>
-             <span className="text-[9px] font-black text-slate-500 px-2 py-0.5 border border-white/5 rounded">VERIFIED_LOGS</span>
+             <span className="text-[9px] font-black text-slate-500 px-2 py-0.5 border border-white/5 rounded lowercase">operational_logs</span>
           </div>
           <div className="flex-1 bg-black/30 rounded border border-white/5 p-6 overflow-hidden">
-             <div ref={terminalRef} className="h-full overflow-y-auto terminal-compact scrollbar-hide text-slate-400">
+             <div ref={terminalRef} className="h-full overflow-y-auto terminal-compact scrollbar-hide text-slate-400 font-mono">
                 {(terminalLogs || []).map((log, i) => (
                    <div key={i} className="mb-2 flex gap-4 border-l border-white/5 pl-5 hover:bg-white/5 transition-colors group">
                       <span className="text-[9px] opacity-10 group-hover:opacity-40 select-none">[{i.toString().padStart(3, '0')}]</span>
-                      <span className="whitespace-pre-wrap">{log}</span>
+                      <span className={`whitespace-pre-wrap text-[11px] ${log.includes('[SUCCESS]') ? 'text-[#00BFA5]' : log.includes('[WARN]') ? 'text-amber-500' : ''}`}>{log}</span>
                    </div>
                 ))}
-                {!terminalLogs.length && <div className="text-slate-700 italic">Waiting for authority stream...</div>}
+                {!terminalLogs.length && <div className="text-slate-700 italic text-[11px]">Waiting for authority stream...</div>}
              </div>
           </div>
         </div>
@@ -146,19 +189,19 @@ export default function ResultsPage() {
                 </div>
                 <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                    <span className="text-[10px] text-slate-500 uppercase font-bold">Socket State</span>
-                   <span className="text-[#00BFA5] text-[10px] font-black uppercase">Established</span>
+                   <span className="text-[#00BFA5] text-[10px] font-black uppercase">{isOperational ? 'Established' : 'Standby'}</span>
                 </div>
              </div>
           </div>
 
           <div className="dashboard-card p-8 flex flex-col items-center justify-center text-center space-y-4">
-             <ShieldAlert size={48} className="text-[#0091EA] opacity-20" />
+             <ShieldAlert size={48} className="text-[#00BFA5] opacity-20" />
              <div>
                 <span className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Platform Integrity</span>
                 <p className="text-[10px] text-[#00BFA5] font-black mt-1">INTEL_TDX_VERIFIED</p>
              </div>
              <p className="text-[10px] text-slate-600 leading-relaxed max-w-[200px]">
-                Hardware root-of-trust validated via PCCS certification.
+                Hardware root-of-trust validated via PCCS certification. System remains in isolated enclave.
              </p>
           </div>
         </div>

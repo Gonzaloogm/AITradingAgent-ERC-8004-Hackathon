@@ -1,3 +1,4 @@
+import os, sys; sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 """
 ERC-8004 TEE Agent Base Class
 
@@ -10,9 +11,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 import warnings
 
-from .tee_auth import TEEAuthenticator
-from .registry import RegistryClient
-from .eip712 import EIP712Signer
+from tee_auth import TEEAuthenticator
+from registry import RegistryClient
+from eip712 import EIP712Signer
 
 
 class AgentRole(Enum):

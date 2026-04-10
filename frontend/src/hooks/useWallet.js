@@ -31,6 +31,7 @@ export function useWallet(pollInterval = 10000) {
 
   const formattedBalance = wallet ? formatEth(wallet.balance) : '0.0000';
   const isFunded = wallet?.funded ?? false;
+  const marginReady = wallet?.margin_ready ?? false;
 
-  return { wallet, loading, error, formattedBalance, isFunded, refetch: fetchWallet };
+  return { wallet, loading, error, formattedBalance, isFunded, marginReady, refetch: fetchWallet };
 }

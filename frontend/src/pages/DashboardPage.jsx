@@ -131,7 +131,7 @@ export default function DashboardPage() {
   const asset = agentState.active_symbol || 'SOL';
 
   return (
-    <div className="h-screen max-h-screen overflow-hidden bg-[#0D0F14] text-white flex flex-col p-4 gap-4 animate-fadein">
+    <div className="space-y-4 animate-fadein pb-8">
       
       {/* 1. TOP Intel Grid */}
       <div className="grid grid-cols-4 gap-4 shrink-0">
@@ -140,65 +140,54 @@ export default function DashboardPage() {
         <IntelCard label="SENTIMENT" value={`${agentState.sentiment.toFixed(2)}`} icon={Activity} color="text-[#0091EA]" />
         <IntelCard label="SCANS/MIN" value={`${agentState.attempts}`} icon={Zap} color="text-rose-500" />
       </div>
+      <div className="flex flex-col gap-4">
+         
+         {/* Prices */}
+         <div className="grid grid-cols-4 gap-3 shrink-0">
+            <SignalGridItem label={`${asset} SPOT`} value={`$${agentState.last_spot_price?.toFixed(2)}`} subValue="KRAKEN" status="LIVE" />
+            <SignalGridItem label={`${asset} PERP`} value={`$${agentState.last_perp_price?.toFixed(2)}`} subValue="DYDX" status="LIVE" />
+            <SignalGridItem label="YIELD" value={`${(agentState.last_spread || 0.0135).toFixed(4)}%`} subValue="DELTA" status="OPPORTUNITY" active={true} />
+            <SignalGridItem label="WALLET" value={`${formattedBalance} ETH`} subValue="ENCLAVE" status="SECURE" />
+         </div>
 
-      <div className="flex-1 flex gap-4 min-h-0">
-        
-        {/* LEFT: Core Monitor */}
-        <div className="flex-[72] flex flex-col gap-4 min-w-0">
-           
-           {/* Prices */}
-           <div className="grid grid-cols-4 gap-3 shrink-0">
-              <SignalGridItem label={`${asset} SPOT`} value={`$${agentState.last_spot_price?.toFixed(2)}`} subValue="KRAKEN" status="LIVE" />
-              <SignalGridItem label={`${asset} PERP`} value={`$${agentState.last_perp_price?.toFixed(2)}`} subValue="DYDX" status="LIVE" />
-              <SignalGridItem label="YIELD" value={`${(agentState.last_spread || 0.0135).toFixed(4)}%`} subValue="DELTA" status="OPPORTUNITY" active={true} />
-              <SignalGridItem label="WALLET" value={`${formattedBalance} ETH`} subValue="ENCLAVE" status="SECURE" />
-           </div>
+         {/* Chart */}
+         <div className="bg-[#11141D] border border-white/5 rounded-lg flex flex-col h-[400px] shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
+               <div className="flex items-center gap-2">
+                  <BarChart3 size={14} className="text-[#00BFA5]" />
+                  <span className="text-[10px] font-black uppercase tracking-widest italic">Autonomous_Alpha_Stream</span>
+               </div>
+               <div className="flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#00BFA5] animate-pulse" />
+                  <span className="text-[8px] font-black uppercase">Enclave_Scanning</span>
+               </div>
+            </div>
+            <div className="flex-1 p-4">
+               <PnLChart data={pnlHistory} />
+            </div>
+            <div className="px-4 py-2 border-t border-white/5 bg-black/20 flex items-center gap-2">
+               <Info size={10} className="text-[#0091EA]" />
+               <span className="text-[7px] text-slate-600 font-bold uppercase tracking-widest">
+                  LLM Risk Adjustment active (Gemini 2.0 Flash). Deterministic safety rails verified.
+               </span>
+            </div>
+         </div>
 
-           {/* Chart */}
-           <div className="flex-1 bg-[#11141D] border border-white/5 rounded-lg flex flex-col min-h-0 shadow-2xl overflow-hidden">
-              <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
-                 <div className="flex items-center gap-2">
-                    <BarChart3 size={14} className="text-[#00BFA5]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest italic">Autonomous_Alpha_Stream</span>
+         {/* Terminal */}
+         <div className="h-40 bg-[#11141D] border border-white/5 rounded-lg p-3 flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 mb-2 border-b border-white/5 pb-1">
+               <TerminalIcon size={12} className="text-[#00BFA5]" />
+               <span className="text-[9px] font-black uppercase tracking-widest">Enclave_Tracing</span>
+            </div>
+            <div ref={terminalRef} className="flex-1 overflow-y-auto scrollbar-hide font-mono text-[9px] space-y-0.5">
+               {(terminalLogs || []).slice(-30).map((l, i) => (
+                 <div key={i} className="flex gap-2">
+                   <span className="text-[#0091EA] opacity-40">{new Date().toLocaleTimeString()}</span>
+                   <span className={l.includes('[SUCCESS]') ? 'text-[#00BFA5]' : 'text-slate-400'}>{l}</span>
                  </div>
-                 <div className="flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#00BFA5] animate-pulse" />
-                    <span className="text-[8px] font-black uppercase">Enclave_Scanning</span>
-                 </div>
-              </div>
-              <div className="flex-1 min-h-0 p-4">
-                 <PnLChart data={pnlHistory} />
-              </div>
-              <div className="px-4 py-2 border-t border-white/5 bg-black/20 flex items-center gap-2">
-                 <Info size={10} className="text-[#0091EA]" />
-                 <span className="text-[7px] text-slate-600 font-bold uppercase tracking-widest">
-                    LLM Risk Adjustment active (Gemini 1.5 Flash). Deterministic safety rails verified.
-                 </span>
-              </div>
-           </div>
-
-           {/* Terminal */}
-           <div className="h-32 bg-[#11141D] border border-white/5 rounded-lg p-3 flex flex-col overflow-hidden shrink-0">
-              <div className="flex items-center gap-2 mb-2 border-b border-white/5 pb-1">
-                 <TerminalIcon size={12} className="text-[#00BFA5]" />
-                 <span className="text-[9px] font-black uppercase tracking-widest">Enclave_Tracing</span>
-              </div>
-              <div ref={terminalRef} className="flex-1 overflow-y-auto scrollbar-hide font-mono text-[9px] space-y-0.5">
-                 {(terminalLogs || []).slice(-30).map((l, i) => (
-                   <div key={i} className="flex gap-2">
-                     <span className="text-[#0091EA] opacity-40">{new Date().toLocaleTimeString()}</span>
-                     <span className={l.includes('[SUCCESS]') ? 'text-[#00BFA5]' : 'text-slate-400'}>{l}</span>
-                   </div>
-                 ))}
-              </div>
-           </div>
-        </div>
-
-        {/* RIGHT: Inquiry */}
-        <div className="flex-[28] min-w-0">
-           <StrategicInquiry />
-        </div>
-
+               ))}
+            </div>
+         </div>
       </div>
     </div>
   );

@@ -113,7 +113,7 @@ export default function LiquidityPage() {
         <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-semibold italic">Multi-asset sovereign enclave funding protocol</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-[340px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-[380px]">
 
         {/* RESERVES */}
         <div className="dashboard-card p-6 flex flex-col justify-between">
@@ -148,8 +148,10 @@ export default function LiquidityPage() {
                 <span className="text-xs font-bold text-white uppercase tracking-widest">Asset Inbound Path</span>
              </div>
           </div>
-          <div className="bg-black/20 rounded border border-white/5 p-6 flex flex-col items-center justify-center space-y-4">
-             <QRCode value={wallet?.address || ''} size={120} bgColor="transparent" fgColor="#0091EA" />
+          <div className="bg-black/20 rounded border border-white/5 p-8 flex flex-col items-center justify-center space-y-6 flex-1">
+             <div className="p-3 bg-white rounded-xl shadow-[0_0_20px_rgba(0,145,234,0.15)] overflow-hidden">
+                <QRCode value={wallet?.address || ''} size={150} bgColor="#FFFFFF" fgColor="#0D0F14" />
+             </div>
              <div className="text-center w-full">
                 <span className="text-[8px] text-slate-600 uppercase font-bold block mb-1">Authority ECDSA Path</span>
                 <code className="text-[10px] text-white/40 font-mono break-all leading-relaxed block px-4 py-1 bg-white/5 rounded">
@@ -197,7 +199,7 @@ export default function LiquidityPage() {
              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em] mb-2 lowercase">external_authority_session</span>
              <div className="flex items-center gap-4">
                 <div className="w-2.5 h-2.5 rounded-full bg-[#00BFA5] shadow-[0_0_12px_#00BFA5]" />
-                <span className="text-sm font-mono text-white/80">{formatAddress(userAddress)}</span>
+                <span className="text-base font-mono text-cyan-400 font-bold tracking-tight">{formatAddress(userAddress)}</span>
              </div>
              <span className="text-[10px] text-[#0091EA] mt-4 font-bold uppercase">External_Liquidity: {userBalance} ETH</span>
           </div>
@@ -227,10 +229,10 @@ export default function LiquidityPage() {
              <button
                 onClick={handleManualActivate}
                 disabled={activating || !isFunded || showLockAnim}
-                className={`px-10 py-5 rounded text-[11px] font-bold uppercase tracking-widest transform active:scale-95 transition-all shadow-xl shadow-cyan-500/5 ${
+                className={`px-10 py-5 rounded text-[11px] font-bold uppercase tracking-widest transform active:scale-95 transition-all shadow-xl ${
                    (!isFunded || showLockAnim)
                      ? 'bg-white/5 text-slate-600 cursor-not-allowed opacity-40' 
-                     : 'bg-gradient-to-r from-[#0091EA] to-[#00BFA5] text-white hover:shadow-cyan-500/20'
+                     : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-500/20'
                 }`}
              >
                 {activating ? 'COMMITTING_AUTHORITY...' : (showLockAnim ? 'LOCKED_SECURE' : 'EXECUTE AUTHORIZED INJECTION')}

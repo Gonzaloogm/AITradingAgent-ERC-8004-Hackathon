@@ -10,8 +10,8 @@ from typing import Dict, Any, Optional, List
 from web3 import Web3
 from eth_account import Account
 
-from .chain_config import ChainConfig, get_chain_config_from_env
-from .subgraph_client import SubgraphClient
+from chain_config import ChainConfig, get_chain_config_from_env
+from subgraph_client import SubgraphClient
 
 
 class RegistryClient:

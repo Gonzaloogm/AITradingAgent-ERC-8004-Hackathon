@@ -34,8 +34,7 @@ from eth_account.messages import encode_defunct
 from eth_utils import keccak
 import uvicorn
 
-from src.agent.base import AgentConfig, RegistryAddresses
-from src.templates.server_agent import ServerAgent
+from src.agent.base import AgentConfig, RegistryAddresses, AgentRole
 from src.agent.tee_auth import TEEAuthenticator
 from src.agent.chain_config import get_chain_config_from_env, log_chain_config
 from src.agent.session_store import SessionStore
@@ -83,9 +82,10 @@ os.makedirs(static_path, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # Global agent instance
-agent: Optional[ServerAgent] = None
+agent: Optional[DeltaNeutralEngine] = None
 trading_engine: Optional[DeltaNeutralEngine] = None
 tee_auth: Optional[TEEAuthenticator] = None
+strategy_task: Optional[asyncio.Task] = None
 
 # Chat interface components
 session_store: Optional[SessionStore] = None
@@ -205,7 +205,7 @@ async def prepare_tee_attestation():
 @app.on_event("startup")
 async def startup_event():
   """Initialize agent on startup."""
-  global agent, tee_auth
+  global agent, tee_auth, trading_engine
 
   print("=" * 80)
   print("STARTING LOCAL AGENT SERVER")
@@ -282,8 +282,9 @@ async def startup_event():
   )
 
   # Initialize agent
-  print("\n Initializing agent...")
-  agent = ServerAgent(config, registries)
+  print("\n Initializing agent (DeltaNeutralEngine)...")
+  agent = DeltaNeutralEngine(config, registries)
+  trading_engine = agent # Link names for server compatibility
 
   # Generate agent card
   print("\n Generating agent card...")
@@ -304,11 +305,9 @@ async def startup_event():
   print(f"Domain: {domain}")
   print("\n" + "=" * 80)
 
-  # Initialize and start the Delta Neutral trading engine in the background
-  global trading_engine
-  print("\n [INFO] Starting Delta Neutral Trading Engine (async background task)...")
-  trading_engine = DeltaNeutralEngine()
-  asyncio.create_task(trading_engine.run_loop())
+  # NOTE: Auto-start of scanning loop disabled. Managed via /api/strategy/start
+  print("\n [INFO] Delta Neutral Trading Engine initialized in STANDBY mode.")
+  # asyncio.create_task(agent.run_loop()) 
 
   # Background task to monitor and auto-activate strategy
   async def monitor_activation():
@@ -335,9 +334,42 @@ async def startup_event():
 
   asyncio.create_task(monitor_activation())
 
+@app.post("/api/strategy/start")
+async def start_strategy():
+    """Starts the trading loop as a background task."""
+    global strategy_task, trading_engine
+    if not trading_engine:
+        raise HTTPException(status_code=503, detail="Trading engine not initialized")
+    
+    if strategy_task and not strategy_task.done():
+        return {"success": False, "message": "Strategy already running"}
+    
+    trading_engine.is_running = True
+    # If the user clicks start, we implicitly authorize the strategy
+    trading_engine.is_activated = True 
+    strategy_task = asyncio.create_task(trading_engine.run_loop())
+    
+    print("[SERVER] Strategy started via UI command.")
+    return {"success": True, "message": "Strategy Engaged"}
+
+@app.post("/api/strategy/stop")
+async def stop_strategy():
+    """Stops the trading loop and cancels the task."""
+    global strategy_task, trading_engine
+    if not trading_engine:
+        raise HTTPException(status_code=503, detail="Trading engine not initialized")
+    
+    trading_engine.is_running = False
+    if strategy_task:
+        strategy_task.cancel()
+        strategy_task = None
+    
+    print("[SERVER] Strategy halted via UI command.")
+    return {"success": True, "message": "Strategy Terminated"}
+
 @app.post("/api/activate")
 async def manual_activate():
-    """Manually force strategy activation (e.g., from the UI Inject button)."""
+    """Manually force strategy activation (legacy but kept for compat)."""
     if not trading_engine:
         raise HTTPException(status_code=503, detail="Trading engine not initialized")
     
@@ -648,6 +680,7 @@ async def get_wallet():
       "chain_id": agent.config.chain_id,
       "chain_name": chain_name,
       "funded": float(balance_eth) >= min_balance,
+      "margin_ready": float(balance_eth) >= 0.001,
       "minimum_balance": str(min_balance)
   }
 

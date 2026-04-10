@@ -72,6 +72,9 @@ export class APIClient {
   async quickAction(sessionId, tool, args = {}) {
     return this.post('/api/quick-action', { session_id: sessionId, tool, arguments: args });
   }
+
+  startStrategy() { return this.post('/api/strategy/start'); }
+  stopStrategy()  { return this.post('/api/strategy/stop'); }
 }
 
 export const apiClient = new APIClient();
