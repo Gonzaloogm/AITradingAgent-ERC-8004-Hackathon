@@ -167,12 +167,7 @@ class BaseAgent(ABC):
       Returns:
           Empty string (no-op)
       """
-      warnings.warn(
-          "request_validation is deprecated. ValidationRegistry is no longer "
-          "part of ERC-8004 core. Use TEE attestation for validation instead.",
-          DeprecationWarning,
-          stacklevel=2
-      )
+      # Legacy no-op for backward compatibility
       return ""
 
   async def submit_validation_response(
@@ -193,12 +188,7 @@ class BaseAgent(ABC):
       Returns:
           Empty string (no-op)
       """
-      warnings.warn(
-          "submit_validation_response is deprecated. ValidationRegistry is no longer "
-          "part of ERC-8004 core. Use TEE attestation for validation instead.",
-          DeprecationWarning,
-          stacklevel=2
-      )
+      # Legacy no-op for backward compatibility
       return ""
 
   # Abstract Methods - Implement in derived classes
@@ -364,16 +354,10 @@ def create_agent(
       ValueError: If agent type is unknown
   """
   if agent_type == "server":
-      from ..templates.server_agent import ServerAgent
-      return ServerAgent(config, registries)
-  elif agent_type == "validator":
-      from ..templates.validator_agent import ValidatorAgent
-      return ValidatorAgent(config, registries)
-  elif agent_type == "client":
-      from ..templates.client_agent import ClientAgent
-      return ClientAgent(config, registries)
-  elif agent_type == "custom":
-      from ..templates.custom_agent import CustomAgent
-      return CustomAgent(config, registries)
+      try:
+          from ..templates.server_agent import ServerAgent
+          return ServerAgent(config, registries)
+      except ImportError:
+          raise ValueError("ServerAgent template not found in src/templates/")
   else:
-      raise ValueError(f"Unknown agent type: {agent_type}")
+      raise ValueError(f"Unknown or unsupported agent type for this demo: {agent_type}")

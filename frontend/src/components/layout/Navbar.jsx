@@ -1,115 +1,86 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAgentStatus } from '../../hooks/useAgentStatus';
 import { formatAddress } from '../../utils/formatters';
+import { ShieldCheck, Activity, Wallet, Search } from 'lucide-react';
 
 const navLinks = [
-  { to: '/',          label: 'Dashboard',  icon: '⬡' },
-  { to: '/results',   label: 'Live Ops',   icon: '◎' },
+  { to: '/',          label: 'Dashboard',      icon: <Activity size={14} /> },
+  { to: '/results',   label: 'Live Ops',       icon: <Search size={14} /> },
+  { to: '/liquidity', label: 'Liquidity',      icon: <Wallet size={14} /> },
+  { to: '/audit',     label: 'Security Audit', icon: <ShieldCheck size={14} /> },
 ];
 
 export default function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const { status } = useAgentStatus(20000);
+  const [isOperational, setIsOperational] = useState(localStorage.getItem('DEMO_OPERATIONAL') === 'true');
 
   const isOnline = !!status;
-  const isRegistered = status?.agent?.is_registered;
   const shortAddr = status?.agent?.address ? formatAddress(status.agent.address) : '—';
 
+  useEffect(() => {
+    const checkState = () => {
+      setIsOperational(localStorage.getItem('DEMO_OPERATIONAL') === 'true');
+    };
+    window.addEventListener('storage', checkState);
+    const interval = setInterval(checkState, 1000);
+    return () => {
+      window.removeEventListener('storage', checkState);
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
-    <nav className="glass-panel sticky top-0 z-50 px-4 sm:px-6 py-3 mb-6 flex items-center justify-between">
-      {/* Brand */}
-      <div className="flex items-center gap-3">
-        <div
-          className="w-9 h-9 rounded-full flex-shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, #00f3ff, #9d00ff)',
-            boxShadow: '0 0 20px rgba(0,243,255,0.4)',
-            animation: 'orbPulse 3s ease-in-out infinite alternate',
-          }}
-        />
-        <div className="hidden sm:block">
-          <p className="gradient-text font-extrabold tracking-widest text-sm leading-tight">AI TRADING AGENT</p>
-          <p className="text-gray-500 text-xs font-mono">ERC-8004 · TEE Secured</p>
-        </div>
+    <nav className="sticky-header flex items-center justify-between px-10 mb-8 shadow-sm">
+      {/* Brand - Minimalism */}
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded bg-gradient-to-br from-[#0091EA] to-[#00BFA5] shadow-lg shadow-cyan-500/20" />
+        <span className="text-white font-bold tracking-tight text-base uppercase">Striker</span>
       </div>
 
-      {/* Desktop links */}
-      <div className="hidden md:flex items-center gap-1">
+      {/* Corporate Tabs */}
+      <div className="flex items-center gap-1">
         {navLinks.map(link => (
           <NavLink
             key={link.to}
             to={link.to}
             end={link.to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              `flex items-center gap-2 px-6 h-[60px] text-[10px] font-semibold uppercase tracking-wider transition-all duration-300 transform ${
                 isActive
-                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                  : 'text-gray-400 hover:text-white hover:bg-white/[0.06]'
+                  ? 'text-[#00BFA5] active-tab-indicator'
+                  : 'text-gray-500 hover:text-white'
               }`
             }
           >
-            <span className="text-base leading-none">{link.icon}</span>
+            {link.icon}
             {link.label}
           </NavLink>
         ))}
       </div>
 
-      {/* Agent status badges */}
-      <div className="hidden lg:flex items-center gap-2">
-        <div className="flex items-center gap-2 bg-black/30 border border-white/[0.08] rounded-lg px-3 py-1.5 font-mono text-xs">
-          <span className={`pulse-dot ${isOnline ? 'green' : 'red'}`} />
-          <span className="text-gray-300">{isOnline ? 'Online' : 'Offline'}</span>
+      {/* Status & ID - Corporate Right */}
+      <div className="flex items-center gap-8">
+        <div className="flex items-center gap-2 py-1 px-3 bg-white/5 rounded-full border border-white/5">
+          <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
+            !isOnline ? 'bg-red-500' : 
+            isOperational ? 'bg-[#00BFA5] animate-pulse shadow-[0_0_8px_#00BFA5]' : 
+            'bg-amber-400'
+          }`} />
+          <span className={`text-[9px] font-bold uppercase tracking-widest leading-none ${
+            !isOnline ? 'text-gray-500' : 
+            isOperational ? 'text-[#00BFA5]' : 
+            'text-amber-400'
+          }`}>
+            {!isOnline ? 'System Offline' : isOperational ? 'Operational' : 'Validated Ready'}
+          </span>
         </div>
-        {status?.agent?.address && (
-          <div className="hidden xl:flex items-center gap-2 bg-black/30 border border-white/[0.08] rounded-lg px-3 py-1.5 font-mono text-xs text-gray-300">
-            {shortAddr}
-          </div>
-        )}
-        <div className={`flex items-center gap-2 bg-black/30 border rounded-lg px-3 py-1.5 font-mono text-xs ${
-          isRegistered ? 'border-emerald-500/30 text-emerald-400' : 'border-white/[0.08] text-yellow-400'
-        }`}>
-          <span className={`pulse-dot ${isRegistered ? 'green' : 'yellow'}`} />
-          {isRegistered ? 'Registered' : 'Unregistered'}
+        
+        <div className="flex flex-col items-end">
+          <span className="text-[7px] text-gray-600 font-bold uppercase tracking-tighter mb-0.5">Enclave_Identity</span>
+          <span className="text-[10px] font-mono text-white/80 leading-none">{shortAddr}</span>
         </div>
       </div>
-
-      {/* Hamburger */}
-      <button
-        className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-        onClick={() => setMenuOpen(o => !o)}
-        aria-label="Toggle menu"
-      >
-        {menuOpen ? '✕' : '☰'}
-      </button>
-
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 glass-panel mx-4 p-3 flex flex-col gap-1 md:hidden">
-          {navLinks.map(link => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/'}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-cyan-500/15 text-cyan-400'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.06]'
-                }`
-              }
-            >
-              <span>{link.icon}</span>
-              {link.label}
-            </NavLink>
-          ))}
-          <div className="border-t border-white/[0.06] mt-2 pt-2 flex items-center gap-2 px-2 text-xs font-mono text-gray-500">
-            <span className={`pulse-dot ${isOnline ? 'green' : 'red'}`} />
-            {isOnline ? 'Online' : 'Offline'} · {shortAddr}
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

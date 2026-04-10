@@ -333,6 +333,9 @@ class ChatAgent:
                 }
             })
 
+        max_iterations = 5
+        tool_results = []
+
         for _ in range(max_iterations):
             try:
                 # Call the API
@@ -368,13 +371,15 @@ class ChatAgent:
 
                     # Execute the tool
                     result = await self._execute_tool(tool_name, tool_input)
-                    tool_calls.append({
+                    
+                    # Track result for return
+                    tool_results.append({
                         "tool": tool_name,
                         "input": tool_input,
                         "result": result
                     })
 
-                    # Add tool result to history
+                    # Add tool result to messages for next iteration
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
@@ -386,11 +391,11 @@ class ChatAgent:
                 response_text = content or ""
                 # Add assistant response to session (if any text was returned)
                 if response_text:
-                    session.add_message("assistant", response_text, tool_calls if tool_calls else None)
-                return response_text, tool_calls
+                    session.add_message("assistant", response_text, tool_results if tool_results else None)
+                return response_text, tool_results
 
         # If we hit max iterations, return what we have
-        return "I apologize, but I encountered an issue processing your request. Please try again.", tool_calls
+        return "I apologize, but I encountered an issue processing your request. Please try again.", tool_results
 
     def get_initial_greeting(self) -> str:
         """Get the initial greeting message."""
