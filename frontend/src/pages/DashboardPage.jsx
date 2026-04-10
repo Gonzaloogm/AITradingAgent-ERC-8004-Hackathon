@@ -136,12 +136,11 @@ export default function DashboardPage() {
       <div className="flex items-center gap-3 mb-2">
         <img
           src="/img/striker-logo.png"
-          alt="CogniTEE"
+          alt="STRIKER"
           className="h-9 w-auto object-contain rounded"
-          style={{ filter: 'brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(180deg)' }}
         />
         <div className="flex flex-col">
-          <span className="text-white font-black text-base uppercase tracking-widest leading-none">CogniTEE</span>
+          <span className="text-white font-black text-base uppercase tracking-widest leading-none">STRIKER</span>
           <span className="text-[9px] text-slate-500 uppercase tracking-[0.25em] font-bold">STRIKER Engine · ERC-8004</span>
         </div>
       </div>

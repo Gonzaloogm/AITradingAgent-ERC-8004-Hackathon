@@ -37,14 +37,7 @@ export default function LandingPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
 
-      {/* ── LOGO: absolute top-left ── */}
-      <div className="absolute top-0 left-0 p-8 z-50">
-        <img
-          src="/img/striker-logo.png"
-          alt="CogniTEE"
-          className="h-12 w-auto object-contain"
-        />
-      </div>
+
 
       {/* Ambient glow blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -54,9 +47,8 @@ export default function LandingPage() {
 
       {/* ── HERO (centrado) ── */}
       <div
-        className={`relative z-10 flex flex-col items-center justify-center min-h-screen px-6 pb-32 transition-all duration-700 ${
-          visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
-        }`}
+        className={`relative z-10 flex flex-col items-center justify-center min-h-screen px-6 pb-32 transition-all duration-700 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+          }`}
       >
         <div className="flex flex-col items-center text-center max-w-3xl w-full">
 
@@ -71,11 +63,11 @@ export default function LandingPage() {
           {/* Headline */}
           <h1 className="text-5xl sm:text-6xl font-black tracking-tight text-white mb-4 leading-[1.05]">
             <span className="bg-gradient-to-r from-white via-white to-slate-400 bg-clip-text text-transparent">
-              CogniTEE
+              STRIKER
             </span>
             <br />
             <span className="text-2xl sm:text-3xl font-bold text-slate-400 tracking-wide">
-              Verified Autonomous Trading
+              STRIKER - Verified Autonomous Trading
             </span>
           </h1>
 
