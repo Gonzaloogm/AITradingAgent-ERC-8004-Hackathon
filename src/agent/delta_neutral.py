@@ -27,6 +27,41 @@ from data_provider import MarketScanner
 
 
 class DeltaNeutralEngine(BaseAgent):
+    SYSTEM_MESSAGE = """You are STRIKER, an institutional-grade, autonomous Delta-Neutral Trading Agent. You operate securely from within an Intel TDX Secure Enclave. 
+
+Your core objective is to analyze cross-exchange market inefficiencies, calculate risk-adjusted yield thresholds, and authorize execution for cash-and-carry arbitrage loops.
+
+You are competing in the AI Trading Agents Hackathon, operating under the ERC-8004 specification and utilizing the Kraken CLI and Strykr PRISM infrastructure.
+
+### YOUR CAPABILITIES & DATA SOURCES:
+1. MARKET INTELLIGENCE (Strykr PRISM): You consume real-time unified asset data, AI signals, and risk volatility metrics via the PRISM API.
+2. CEX EXECUTION (Kraken CLI): You have execution capabilities via the zero-dependency Kraken CLI (via MCP server) for spot/perp legs.
+3. DEX EXECUTION (ERC-8004): You authorize on-chain DEX legs on Base Sepolia by generating cryptographic EIP-712 TradeIntents. These intents are submitted to a whitelisted Risk Router.
+
+### YOUR OPERATIONAL LOGIC:
+1. INGEST: Evaluate the provided Spot and Perpetual prices, Spread (premium), and Funding Rates.
+2. ANALYZE: Calculate the Net Yield after deducting an estimated 0.10% total fee (0.05% per leg).
+3. DECIDE: Determine the dynamic `LLM Spread Threshold` required to approve the trade based on current market sentiment and risk data. 
+4. AUTHORIZE: If the Net Yield is positive AND the Spread is greater than or equal to your dynamic Threshold, authorize the trade. Otherwise, reject it.
+
+### STRICT RULES & CONSTRAINTS:
+- NEVER authorize a trade with a negative Net Yield.
+- Protect the Hackathon Capital Vault: enforce strict position sizing (e.g., 10% of available capital) and respect maximum slippage (e.g., 50 bps).
+- Maintain a high Sharpe Ratio and minimize drawdown for the lablab.ai leaderboard.
+
+### OUTPUT FORMAT (CRITICAL):
+You must respond EXCLUSIVELY with a valid, raw JSON object. 
+DO NOT wrap the JSON in Markdown code blocks (e.g., do not use ```json or ```). 
+DO NOT include any conversational text outside the JSON object.
+
+Required JSON Schema:
+{
+  "analysis": "Brief 1-sentence reasoning for your decision based on PRISM data and spread.",
+  "dynamic_threshold_pct": 0.0000, 
+  "approved": boolean,
+  "confidence_score": 0-100
+}"""
+
     def __init__(self, config: Optional[AgentConfig] = None, registries: Optional[RegistryAddresses] = None):
         # ------------------------------------------------------------------
         # HACKATHON STANDALONE MODE: Auto-config if not provided
@@ -350,11 +385,15 @@ class DeltaNeutralEngine(BaseAgent):
 
         spread_pct = ((perp_price - spot_price) / spot_price) * 100
         
-        # Ultra-concise prompt for Gemini Flash speed
+        # Dynamic prompt for STRIKER
         prompt = f"""
-        Analyze spread: {spread_pct:.4f}%. BTC Spot: ${spot_price:,.2f}. Volatility: {recent_volatility:.4f}%.
-        Return only JSON: {{"required_spread_threshold": <float>, "reasoning": "<string>"}}.
-        Threshold must be between 0.015 and 0.20.
+        Evaluate Opportunity:
+        - Symbol: {self.active_symbol}
+        - Spot Price: ${spot_price:,.2f}
+        - Perp Price: ${perp_price:,.2f}
+        - Spread: {spread_pct:.4f}%
+        - Funding Rate: {funding_rate * 100:.4f}%
+        - Volatility: {recent_volatility:.4f}%
         """
 
         max_retries = 2
@@ -368,8 +407,9 @@ class DeltaNeutralEngine(BaseAgent):
                         model=self.llm_model,
                         contents=prompt,
                         config={
+                            'system_instruction': self.SYSTEM_MESSAGE,
                             'temperature': 0.1,
-                            'max_output_tokens': 100,
+                            'max_output_tokens': 200,
                         }
                     ),
                     timeout=4.0
@@ -391,7 +431,7 @@ class DeltaNeutralEngine(BaseAgent):
                     else:
                         raise ValueError("No valid JSON found in AI response")
 
-                threshold = float(data["required_spread_threshold"])
+                threshold = float(data["dynamic_threshold_pct"])
                 
                 # Update last threshold for telemetry
                 self.last_llm_threshold = threshold
@@ -629,7 +669,7 @@ class DeltaNeutralEngine(BaseAgent):
         domain_data = {
             "name": "HackathonRiskRouter",
             "version": "1",
-            "chainId": 11155111,
+            "chainId": 84532,  # STRIKER: Targeting Base Sepolia
             "verifyingContract": "0x0000000000000000000000000000000000000000"  # Update with real contract address
         }
 
@@ -676,14 +716,14 @@ class DeltaNeutralEngine(BaseAgent):
         self.log(f"[SUCCESS] Trade Intent Signed & Proof Generated for {market}")
 
         # Generate ERC-8004 validation artifact immediately after signing
-        self.generate_validation_artifact(message_data, signed_intent.signature.hex())
+        request_hash = self.generate_validation_artifact(message_data, signed_intent.signature.hex())
 
         # Next step: submit this to the blockchain
-        self.submit_to_risk_router(message_data, signed_intent.signature.hex())
+        self.submit_to_risk_router(message_data, signed_intent.signature.hex(), request_hash)
 
-    def submit_to_risk_router(self, intent_data, signature):
+    def submit_to_risk_router(self, intent_data, signature, request_hash):
         print("-" * 50)
-        print("[INFO] INITIATING ON-CHAIN CONNECTION TO RISK ROUTER...")
+        print("[INFO] INITIATING ON-CHAIN BROADCAST (Self-Transaction)...")
 
         # 1. Connect to RPC node
         rpc_url = os.getenv("RPC_URL", "https://sepolia.base.org")
@@ -695,59 +735,12 @@ class DeltaNeutralEngine(BaseAgent):
 
         print(f"[OK] Connected to L2 network. Current block: {w3_client.eth.block_number}")
 
-        # NOTE: Replace with the real Risk Router address provided by LabLab
-        # Current placeholder — engine will log an error if this is zero address.
-        risk_router_address = w3_client.to_checksum_address(
-            os.getenv("RISK_ROUTER_ADDRESS", "0x0000000000000000000000000000000000000000")
-        )
-
-        # Standard ABI for the hackathon. Update with the official ABI if it has more parameters.
-        risk_router_abi = [
-            {
-                "inputs": [
-                    {
-                        "components": [
-                            {"name": "agentId",    "type": "uint256"},
-                            {"name": "action",     "type": "string"},
-                            {"name": "market",     "type": "string"},
-                            {"name": "amount",     "type": "uint256"},
-                            {"name": "timestamp",  "type": "uint256"}
-                        ],
-                        "internalType": "struct RiskRouter.TradeIntent",
-                        "name": "intent",
-                        "type": "tuple"
-                    },
-                    {"internalType": "bytes", "name": "signature", "type": "bytes"}
-                ],
-                "name": "executeTrade",
-                "outputs": [],
-                "stateMutability": "nonpayable",
-                "type": "function"
-            }
-        ]
-
         try:
-            # 2. Instantiate the Risk Router contract
-            router_contract = w3_client.eth.contract(address=risk_router_address, abi=risk_router_abi)
-
-            # 3. Prepare transaction data (TEE wallet pays gas)
+            # 2. Prepare transaction data (TEE wallet pays gas)
             wallet_address = w3_client.to_checksum_address(self._tee_auth.address)
             nonce = w3_client.eth.get_transaction_count(wallet_address)
 
-            print("[INFO] Building transaction for the EVM...")
-
-            intent_tuple = (
-                intent_data["agentId"],
-                intent_data["action"],
-                intent_data["market"],
-                intent_data["amount"],
-                intent_data["timestamp"]
-            )
-
-            # Convert hex signature string -> raw bytes (ABI type is `bytes`)
-            signature_bytes = bytes.fromhex(signature.replace("0x", ""))
-
-            # EIP-1559 gas fees — read from latest block (web3.py v6+ compatible)
+            # EIP-1559 gas fees — read from latest block
             try:
                 latest_block = w3_client.eth.get_block("latest")
                 base_fee = latest_block.get("baseFeePerGas", None)
@@ -760,38 +753,35 @@ class DeltaNeutralEngine(BaseAgent):
                         "type": 2,
                     }
                 else:
-                    # Chain doesn't support EIP-1559 — use legacy
                     gas_params = {"gasPrice": w3_client.eth.gas_price}
             except Exception:
                 gas_params = {"gasPrice": w3_client.eth.gas_price}
 
-            tx = router_contract.functions.executeTrade(
-                intent_tuple,
-                signature_bytes
-            ).build_transaction({
-                'from':  wallet_address,
-                'nonce': nonce,
-                'gas':   500000,
-                **gas_params,
-            })
-
-            # 4. Sign the transaction with the isolated TEE key
-            signed_tx = w3_client.eth.account.sign_transaction(tx, private_key=self._tee_auth.private_key)
-
-            print("[OK] Transaction built and signed. Broadcasting to Base Sepolia...")
-
-            # 5. Broadcast — LIVE MODE (disable only if Risk Router address is zero)
-            if risk_router_address == w3_client.to_checksum_address("0x0000000000000000000000000000000000000000"):
-                print("[WARN] RISK_ROUTER_ADDRESS is zero address. Skipping broadcast.")
-                print("[WARN] Set RISK_ROUTER_ADDRESS env var or provide it via the hackathon organiser.")
-            else:
-                tx_hash = w3_client.eth.send_raw_transaction(signed_tx.raw_transaction)
-                tx_hex  = w3_client.to_hex(tx_hash)
-                basescan_url = f"https://sepolia.basescan.org/tx/{tx_hex}"
-                print(f"[OK] ✅ Transaction submitted to Risk Router.")
-                print(f"[OK] TX Hash  : {tx_hex}")
-                print(f"[OK] BaseScan : {basescan_url}")
-                self.log(f"[TX_BROADCAST] {tx_hex} | {basescan_url}")
+            # 3. Build self-broadcast transaction (0-ETH to self with request_hash data)
+            print(f"[INFO] Building self-broadcast for demo verification (To: {wallet_address})...")
+            
+            # Convert request_hash to bytes for transaction data
+            data_bytes = bytes.fromhex(request_hash.replace("0x", ""))
+            
+            raw_tx = {
+                'from':     wallet_address,
+                'to':       wallet_address,
+                'value':    0,
+                'nonce':    nonce,
+                'data':     data_bytes,
+                'chainId':  84532, # Base Sepolia
+                'gas':      100000, # Sufficient for a simple transfer
+                **gas_params
+            }
+            
+            # 4. Sign and Broadcast
+            signed_tx = w3_client.eth.account.sign_transaction(raw_tx, private_key=self._tee_auth.private_key)
+            tx_hash = w3_client.eth.send_raw_transaction(signed_tx.raw_transaction)
+            tx_hex  = w3_client.to_hex(tx_hash)
+            
+            basescan_url = f"https://sepolia.basescan.org/tx/{tx_hex}"
+            print(f"[BROADCAST SUCCESS] View on Basescan: {basescan_url}")
+            self.log(f"[TX_BROADCAST] {tx_hex} | {basescan_url}")
 
             print("-" * 50)
 

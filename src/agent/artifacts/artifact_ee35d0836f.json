@@ -1,0 +1,17 @@
+{
+  "execution": {
+    "signature": "7409c115a78610d024eeaddbb7433a5de6cbcaf1d58b22018a723af9fcb334bb4eb462ad0aa5e81661d4994d6e996954084ee52352d36af018eeeb42465ecc871b",
+    "trade_intent": {
+      "action": "LONG_SPOT_SHORT_PERP",
+      "agentId": 1,
+      "amount": 499892965510837,
+      "deadline": 1775831084,
+      "market": "ETH",
+      "maxSlippageBps": 50,
+      "timestamp": 1775830784
+    }
+  },
+  "protocol": "ERC-8004",
+  "registry": "ValidationRegistry",
+  "timestamp": 1775830784
+}

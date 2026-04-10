@@ -18,9 +18,14 @@ export default function ResultsPage() {
 
   // Sync isOperational with global status
   useEffect(() => {
-    if (status?.status === 'running' || status?.is_activated) {
+    // 2. Persistencia de Estado: Solo cambiamos el estado si el servidor devuelve una respuesta clara
+    if (!status) return; 
+
+    // Solo actualizamos si hay un cambio definitivo en el estado del motor
+    if (status.status === 'running' || status.is_activated) {
         setIsOperational(true);
-    } else {
+    } else if (status.status === 'halted' || status.status === 'operational') {
+        // En este backend, 'operational' significa que está listo pero no corriendo (halted)
         setIsOperational(false);
     }
   }, [status]);
@@ -51,25 +56,33 @@ export default function ResultsPage() {
   }, []);
 
   const handleStart = async () => {
+    // 3. Optimistic UI: Cambiamos el estado local inmediatamente
+    setIsOperational(true);
     setIsStarting(true);
+    
     const res = await apiClient.startStrategy();
     if (res.success) {
       toast.success('Enclave rails engaged successfully');
-      setIsOperational(true);
       refetchWallet();
     } else {
+      // Revertimos si falla
+      setIsOperational(false);
       toast.error('Engagement failed: ' + res.error);
     }
     setIsStarting(false);
   };
 
   const handleStop = async () => {
+    // 3. Optimistic UI: Cambiamos el estado local inmediatamente
+    setIsOperational(false);
     setIsStopping(true);
+    
     const res = await apiClient.stopStrategy();
     if (res.success) {
       toast.info('Autonomous strategy terminated');
-      setIsOperational(false);
     } else {
+      // Revertimos si falla
+      setIsOperational(true);
       toast.error('Termination failed: ' + res.error);
     }
     setIsStopping(false);
@@ -81,14 +94,7 @@ export default function ResultsPage() {
     }
   }, [terminalLogs]);
 
-  if (statusLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0D0F14]">
-        <LoadingSpinner size="lg" />
-        <p className="mt-8 text-xs font-bold text-slate-600 uppercase tracking-widest animate-pulse">Syncing Mirror Telemetry...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="space-y-6 animate-fadein max-w-[1600px] mx-auto pb-10">
