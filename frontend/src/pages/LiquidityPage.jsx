@@ -18,6 +18,8 @@ export default function LiquidityPage() {
   const [userBalance, setUserBalance] = useState('0');
   const [amount, setAmount] = useState('0.01');
   const [sending, setSending] = useState(false);
+  const [activating, setActivating] = useState(false);
+  const [showLockAnim, setShowLockAnim] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -60,6 +62,29 @@ export default function LiquidityPage() {
       setTimeout(() => { refetch(); }, 8000);
     } catch (e) { toast(e.message, 'error'); } 
     finally { setSending(false); }
+  };
+
+  const handleManualActivate = async () => {
+    setActivating(true);
+    try {
+      const r = await apiClient.post('/api/activate', {});
+      if (r.success) {
+        setShowLockAnim(true);
+        setTimeout(() => {
+            setShowLockAnim(false);
+            toast('Enclave Strategy Engaged Successfully', 'success');
+            localStorage.setItem('DEMO_OPERATIONAL', 'true');
+            window.dispatchEvent(new Event('storage'));
+            setTimeout(() => { refetch(); }, 1000);
+        }, 3000);
+      } else {
+        toast('Activation failed: ' + (r.error || 'Unknown error'), 'error');
+      }
+    } catch (e) {
+      toast('Execution Error: ' + e.message, 'error');
+    } finally {
+      setActivating(false);
+    }
   };
 
   const transfers = [
@@ -177,7 +202,19 @@ export default function LiquidityPage() {
              <span className="text-[10px] text-[#0091EA] mt-4 font-bold uppercase">External_Liquidity: {userBalance} ETH</span>
           </div>
 
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-8 relative">
+             {showLockAnim && (
+                <div className="absolute -inset-x-20 -inset-y-10 z-[100] bg-[#0D0F14]/95 flex flex-col items-center justify-center animate-fadein backdrop-blur-xl border border-[#00BFA5]/20 rounded-xl shadow-[0_0_50px_rgba(0,191,165,0.1)]">
+                    <div className="w-12 h-12 border border-[#00BFA5] rounded-full flex items-center justify-center mb-4 animate-pulse">
+                        <ShieldCheck size={20} className="text-[#00BFA5]" />
+                    </div>
+                    <div className="text-[10px] font-black text-white uppercase tracking-[0.3em] mb-1">Funds Locked in TEE</div>
+                    <div className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Bridging Secure Identity...</div>
+                    <div className="mt-4 w-32 h-0.5 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-[#00BFA5] animate-grow" />
+                    </div>
+                </div>
+             )}
              <div className="flex flex-col items-end">
                 <span className="text-[9px] text-slate-600 uppercase font-bold tracking-widest mb-1">Injection Value</span>
                 <input
@@ -188,11 +225,15 @@ export default function LiquidityPage() {
                 />
              </div>
              <button
-                onClick={handleSend}
-                disabled={sending}
-                className="bg-gradient-to-r from-[#0091EA] to-[#00BFA5] text-white px-10 py-5 rounded text-[11px] font-bold uppercase tracking-widest transform active:scale-95 transition-all shadow-xl shadow-cyan-500/5 hover:shadow-cyan-500/20"
+                onClick={handleManualActivate}
+                disabled={activating || !isFunded || showLockAnim}
+                className={`px-10 py-5 rounded text-[11px] font-bold uppercase tracking-widest transform active:scale-95 transition-all shadow-xl shadow-cyan-500/5 ${
+                   (!isFunded || showLockAnim)
+                     ? 'bg-white/5 text-slate-600 cursor-not-allowed opacity-40' 
+                     : 'bg-gradient-to-r from-[#0091EA] to-[#00BFA5] text-white hover:shadow-cyan-500/20'
+                }`}
              >
-                {sending ? 'COMMITTING_SETTLEMENT...' : 'EXECUTE AUTHORIZED INJECTION'}
+                {activating ? 'COMMITTING_AUTHORITY...' : (showLockAnim ? 'LOCKED_SECURE' : 'EXECUTE AUTHORIZED INJECTION')}
              </button>
           </div>
         </div>

@@ -18,9 +18,6 @@ from .eip712 import EIP712Signer
 class AgentRole(Enum):
   """Agent role types."""
   SERVER = "server"
-  VALIDATOR = "validator"
-  CLIENT = "client"
-  CUSTOM = "custom"
 
 
 @dataclass
@@ -148,48 +145,6 @@ class BaseAgent(ABC):
       return await self._registry_client.submit_feedback(
           target_agent_id, rating, data
       )
-
-  async def request_validation(
-      self,
-      validator_agent_id: int,
-      data_hash: str
-  ) -> str:
-      """
-      DEPRECATED: ValidationRegistry is no longer part of ERC-8004 core.
-
-      This method is kept for backward compatibility but does nothing.
-      Use TEE attestation for validation instead.
-
-      Args:
-          validator_agent_id: ID of validator
-          data_hash: Hash of data to validate
-
-      Returns:
-          Empty string (no-op)
-      """
-      # Legacy no-op for backward compatibility
-      return ""
-
-  async def submit_validation_response(
-      self,
-      data_hash: str,
-      response: int
-  ) -> str:
-      """
-      DEPRECATED: ValidationRegistry is no longer part of ERC-8004 core.
-
-      This method is kept for backward compatibility but does nothing.
-      Use TEE attestation for validation instead.
-
-      Args:
-          data_hash: Hash of validated data
-          response: Validation result (0=invalid, 1=valid, 2=uncertain)
-
-      Returns:
-          Empty string (no-op)
-      """
-      # Legacy no-op for backward compatibility
-      return ""
 
   # Abstract Methods - Implement in derived classes
   @abstractmethod
@@ -331,33 +286,3 @@ class BaseAgent(ABC):
           "use_tee": self.config.use_tee_auth,
           "plugins": self.list_plugins()
       }
-
-
-# Factory function for easy agent creation
-def create_agent(
-  agent_type: str,
-  config: AgentConfig,
-  registries: RegistryAddresses
-) -> BaseAgent:
-  """
-  Factory function to create specific agent types.
-
-  Args:
-      agent_type: Type of agent to create
-      config: Agent configuration
-      registries: Registry addresses
-
-  Returns:
-      Agent instance
-
-  Raises:
-      ValueError: If agent type is unknown
-  """
-  if agent_type == "server":
-      try:
-          from ..templates.server_agent import ServerAgent
-          return ServerAgent(config, registries)
-      except ImportError:
-          raise ValueError("ServerAgent template not found in src/templates/")
-  else:
-      raise ValueError(f"Unknown or unsupported agent type for this demo: {agent_type}")

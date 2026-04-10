@@ -7,8 +7,8 @@ import React from 'react';
 export default function PnLChart({ data }) {
   if (!data || data.length < 2) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-gray-600 font-sans text-xs">
-        System Initializing...
+      <div className="h-full w-full flex items-center justify-center text-slate-700 font-mono text-[10px] uppercase tracking-widest animate-pulse">
+        Stabilizing Enclave Link...
       </div>
     );
   }

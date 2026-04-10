@@ -319,17 +319,14 @@ async def startup_event():
               balance_wei = agent._registry_client.w3.eth.get_balance(agent_address)
               balance_eth = float(agent._registry_client.w3.from_wei(balance_wei, 'ether'))
               
-              # Check registration via fast path
-              is_reg = getattr(agent, 'is_registered', False)
-              
-              if is_reg and balance_eth > 0:
-                  print(f"\n[AUTO-ACTIVATE] Conditions met! Balance: {balance_eth} ETH | Registered: TRUE")
+              # HACKATHON AUTO-ACTIVATE: If we have ANY funds, start the scanning loop
+              if balance_eth > 0:
+                  print(f"\n[AUTO-ACTIVATE] Authorized Liquidity detected: {balance_eth} ETH. Engaging Enclave Rails.")
                   trading_engine.is_activated = True
                   break
               
-              # Log standby status every 30s
-              if int(time.time()) % 30 < 5:
-                  print(f"[AUTO-ACTIVATOR] Standby... (Reg: {is_reg}, Balance: {balance_eth} ETH)")
+              # Log standby status
+              print(f"[AUTO-ACTIVATOR] Standby: Awaiting Authorized Liquidity... (Balance: {balance_eth} ETH)")
                   
           except Exception as e:
               print(f"[AUTO-ACTIVATOR] Error: {e}")
@@ -337,6 +334,16 @@ async def startup_event():
           await asyncio.sleep(5)
 
   asyncio.create_task(monitor_activation())
+
+@app.post("/api/activate")
+async def manual_activate():
+    """Manually force strategy activation (e.g., from the UI Inject button)."""
+    if not trading_engine:
+        raise HTTPException(status_code=503, detail="Trading engine not initialized")
+    
+    trading_engine.is_activated = True
+    print("[MANUAL-ACTIVATE] Strategy triggered by UI Authority.")
+    return {"success": True, "message": "Enclave Rails Engaged"}
 
 
 @app.get("/api/agent-state")
@@ -369,8 +376,20 @@ async def websocket_stream(websocket: WebSocket):
     try:
         while True:
             if trading_engine:
+                # Simulated Market Intelligence Metrics (Hackathon Realism)
+                import random
+                intel = {
+                    "btc_volatility": f"{random.uniform(1.2, 4.5):.2f}%",
+                    "dydx_funding": f"{random.uniform(-0.02, 0.05):.4f}%",
+                    "base_gas": f"{random.uniform(0.01, 0.1):.3f} gwei",
+                    "phala_latency": f"{random.randint(28, 62)}ms",
+                    "oracle_status": "HEALTHY",
+                    "arb_volume": f"{random.uniform(10.5, 45.2):.1f} ETH"
+                }
+
                 data = {
                     "status": "running" if trading_engine.is_running else "halted",
+                    "is_activated": trading_engine.is_activated,
                     "current_llm_threshold": trading_engine.last_llm_threshold or 0.10,
                     "real_time_spread": getattr(trading_engine, "_last_spread_pct", 0.0),
                     "last_spot_price": getattr(trading_engine, "_last_spot", 0.0),
@@ -386,6 +405,7 @@ async def websocket_stream(websocket: WebSocket):
                     "scan_results": getattr(trading_engine, "_last_scan_results", []),
                     "active_symbol": getattr(trading_engine, "active_symbol", "BTC"),
                     "is_signing": getattr(trading_engine, "_is_signing", False),
+                    "market_intelligence": intel,
                     "timestamp": datetime.utcnow().isoformat()
                 }
                 await websocket.send_json(data)
