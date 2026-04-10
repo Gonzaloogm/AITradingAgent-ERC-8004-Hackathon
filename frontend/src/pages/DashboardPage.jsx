@@ -9,28 +9,27 @@ import { toast } from 'sonner';
 
 const IntelCard = ({ label, value, icon: Icon, color = "text-[#0091EA]" }) => (
   <div className="bg-[#161920] border border-white/5 rounded-lg p-3 lg:p-4 flex items-center justify-between group hover:border-[#00BFA5]/30 transition-all shadow-lg overflow-hidden">
-     <div className="flex flex-col min-w-0">
-        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mb-1 truncate">{label}</span>
-        <span className="text-base lg:text-lg font-bold text-white tracking-tight truncate">{value}</span>
-     </div>
-     <div className={`p-2 rounded-lg bg-white/[0.03] ${color} group-hover:bg-white/5 transition-colors flex-shrink-0`}>
-        <Icon size={14} />
-     </div>
+    <div className="flex flex-col min-w-0">
+      <span className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] mb-1 truncate">{label}</span>
+      <span className="text-base lg:text-lg font-bold text-white tracking-tight truncate">{value}</span>
+    </div>
+    <div className={`p-2 rounded-lg bg-white/[0.03] ${color} group-hover:bg-white/5 transition-colors flex-shrink-0`}>
+      <Icon size={14} />
+    </div>
   </div>
 );
 
 const SignalGridItem = ({ label, value, subValue, status, active }) => (
   <div className={`p-3 rounded-lg bg-[#161920] border border-white/5 flex flex-col justify-between ${active ? 'border-[#00BFA5]/40 shadow-[0_0_15px_rgba(0,191,165,0.05)]' : ''}`}>
-     <div className="flex justify-between items-start mb-1">
-        <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
-        <span className={`text-[7px] font-black px-1 py-0.5 rounded ${
-          status === 'OPPORTUNITY' || status === 'SECURE' ? 'bg-[#00BFA5]/10 text-[#00BFA5]' : 'bg-white/5 text-slate-500'
+    <div className="flex justify-between items-start mb-1">
+      <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+      <span className={`text-[7px] font-black px-1 py-0.5 rounded ${status === 'OPPORTUNITY' || status === 'SECURE' ? 'bg-[#00BFA5]/10 text-[#00BFA5]' : 'bg-white/5 text-slate-500'
         }`}>
-          [{status}]
-        </span>
-     </div>
-     <div className="text-sm font-bold text-white leading-none mb-0.5">{value}</div>
-     <div className="text-[8px] text-slate-600 font-medium truncate">{subValue}</div>
+        [{status}]
+      </span>
+    </div>
+    <div className="text-sm font-bold text-white leading-none mb-0.5">{value}</div>
+    <div className="text-[8px] text-slate-600 font-medium truncate">{subValue}</div>
   </div>
 );
 
@@ -45,15 +44,15 @@ export default function DashboardPage() {
   const { status, loading: statusLoading } = useAgentStatus(10000);
 
   const [agentState, setAgentState] = useState({
-     last_spot_price: 144.98, 
-     last_perp_price: 145.13,
-     last_spread: 0.1035,
-     active_symbol: 'SOL',
-     is_ws: false,
-     attempts: 124,
-     sentiment: 0.52
+    last_spot_price: 144.98,
+    last_perp_price: 145.13,
+    last_spread: 0.1035,
+    active_symbol: 'SOL',
+    is_ws: false,
+    attempts: 124,
+    sentiment: 0.52
   });
-  
+
   const [terminalLogs, setTerminalLogs] = useState([]);
   const terminalRef = useRef(null);
   const lastUpdateRef = useRef(Date.now());
@@ -62,21 +61,21 @@ export default function DashboardPage() {
   // Organic PnL Mock Stream
   useEffect(() => {
     const interval = setInterval(() => {
-        setPnlHistory(prev => {
-            const last = prev[prev.length - 1].value;
-            const volatility = 0.00001;
-            const drift = 0.00002;
-            const nextValue = last + (Math.random() * volatility - (volatility/2)) + drift;
-            const now = new Date();
-            const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
-            return [...prev, { time: timeStr, value: nextValue }].slice(-25); 
-        });
-        
-        setAgentState(prev => ({
-            ...prev,
-            attempts: prev.attempts + Math.floor(Math.random() * 3),
-            sentiment: Math.min(0.99, Math.max(0.01, prev.sentiment + (Math.random() * 0.02 - 0.01)))
-        }));
+      setPnlHistory(prev => {
+        const last = prev[prev.length - 1].value;
+        const volatility = 0.00001;
+        const drift = 0.00002;
+        const nextValue = last + (Math.random() * volatility - (volatility / 2)) + drift;
+        const now = new Date();
+        const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
+        return [...prev, { time: timeStr, value: nextValue }].slice(-25);
+      });
+
+      setAgentState(prev => ({
+        ...prev,
+        attempts: prev.attempts + Math.floor(Math.random() * 3),
+        sentiment: Math.min(0.99, Math.max(0.01, prev.sentiment + (Math.random() * 0.02 - 0.01)))
+      }));
     }, 4000);
     return () => clearInterval(interval);
   }, []);
@@ -85,14 +84,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const lastLog = terminalLogs[terminalLogs.length - 1];
     if (lastLog && lastLog.includes('[SUCCESS] Trade Intent Signed') && !processedLogs.current.has(lastLog)) {
-        processedLogs.current.add(lastLog);
-        toast.success('Trade Intent Signed', {
-           style: { background: '#161920', border: '1px solid #00BFA5', color: '#fff' }
-        });
-        setPnlHistory(prev => {
-            const last = prev[prev.length - 1].value;
-            return [...prev, { time: 'EXEC', value: last + 0.0005 }].slice(-25);
-        });
+      processedLogs.current.add(lastLog);
+      toast.success('Trade Intent Signed', {
+        style: { background: '#161920', border: '1px solid #00BFA5', color: '#fff' }
+      });
+      setPnlHistory(prev => {
+        const last = prev[prev.length - 1].value;
+        return [...prev, { time: 'EXEC', value: last + 0.0005 }].slice(-25);
+      });
     }
   }, [terminalLogs]);
 
@@ -111,7 +110,7 @@ export default function DashboardPage() {
             const data = JSON.parse(e.data);
             setAgentState(prev => ({ ...prev, ...data, is_ws: true }));
             if (data?.logs) setTerminalLogs(data.logs);
-          } catch (err) {}
+          } catch (err) { }
         };
         ws.onclose = () => setTimeout(connect, 5000);
       } catch (e) { setTimeout(connect, 5000); }
@@ -132,7 +131,21 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 animate-fadein pb-8">
-      
+
+      {/* Logo – top-left brand mark */}
+      <div className="flex items-center gap-3 mb-2">
+        <img
+          src="/img/striker-logo.png"
+          alt="CogniTEE"
+          className="h-9 w-auto object-contain rounded"
+          style={{ filter: 'brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(180deg)' }}
+        />
+        <div className="flex flex-col">
+          <span className="text-white font-black text-base uppercase tracking-widest leading-none">CogniTEE</span>
+          <span className="text-[9px] text-slate-500 uppercase tracking-[0.25em] font-bold">STRIKER Engine · ERC-8004</span>
+        </div>
+      </div>
+
       {/* 1. TOP Intel Grid */}
       <div className="grid grid-cols-4 gap-4 shrink-0">
         <IntelCard label="GAS (Base)" value="0.012 gwei" icon={Gauge} color="text-amber-500" />
@@ -141,53 +154,53 @@ export default function DashboardPage() {
         <IntelCard label="SCANS/MIN" value={`${agentState.attempts}`} icon={Zap} color="text-rose-500" />
       </div>
       <div className="flex flex-col gap-4">
-         
-         {/* Prices */}
-         <div className="grid grid-cols-4 gap-3 shrink-0">
-            <SignalGridItem label={`${asset} SPOT`} value={`$${agentState.last_spot_price?.toFixed(2)}`} subValue="KRAKEN" status="LIVE" />
-            <SignalGridItem label={`${asset} PERP`} value={`$${agentState.last_perp_price?.toFixed(2)}`} subValue="DYDX" status="LIVE" />
-            <SignalGridItem label="YIELD" value={`${(agentState.last_spread || 0.0135).toFixed(4)}%`} subValue="DELTA" status="OPPORTUNITY" active={true} />
-            <SignalGridItem label="WALLET" value={`${formattedBalance} ETH`} subValue="ENCLAVE" status="SECURE" />
-         </div>
 
-         {/* Chart */}
-         <div className="bg-[#11141D] border border-white/5 rounded-lg flex flex-col h-[400px] shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
-               <div className="flex items-center gap-2">
-                  <BarChart3 size={14} className="text-[#00BFA5]" />
-                  <span className="text-[10px] font-black uppercase tracking-widest italic">Autonomous_Alpha_Stream</span>
-               </div>
-               <div className="flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#00BFA5] animate-pulse" />
-                  <span className="text-[8px] font-black uppercase">Enclave_Scanning</span>
-               </div>
-            </div>
-            <div className="flex-1 p-4">
-               <PnLChart data={pnlHistory} />
-            </div>
-            <div className="px-4 py-2 border-t border-white/5 bg-black/20 flex items-center gap-2">
-               <Info size={10} className="text-[#0091EA]" />
-               <span className="text-[7px] text-slate-600 font-bold uppercase tracking-widest">
-                  LLM Risk Adjustment active (Gemini 2.0 Flash). Deterministic safety rails verified.
-               </span>
-            </div>
-         </div>
+        {/* Prices */}
+        <div className="grid grid-cols-4 gap-3 shrink-0">
+          <SignalGridItem label={`${asset} SPOT`} value={`$${agentState.last_spot_price?.toFixed(2)}`} subValue="KRAKEN" status="LIVE" />
+          <SignalGridItem label={`${asset} PERP`} value={`$${agentState.last_perp_price?.toFixed(2)}`} subValue="DYDX" status="LIVE" />
+          <SignalGridItem label="YIELD" value={`${(agentState.last_spread || 0.0135).toFixed(4)}%`} subValue="DELTA" status="OPPORTUNITY" active={true} />
+          <SignalGridItem label="WALLET" value={`${formattedBalance} ETH`} subValue="ENCLAVE" status="SECURE" />
+        </div>
 
-         {/* Terminal */}
-         <div className="h-40 bg-[#11141D] border border-white/5 rounded-lg p-3 flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 mb-2 border-b border-white/5 pb-1">
-               <TerminalIcon size={12} className="text-[#00BFA5]" />
-               <span className="text-[9px] font-black uppercase tracking-widest">Enclave_Tracing</span>
+        {/* Chart */}
+        <div className="bg-[#11141D] border border-white/5 rounded-lg flex flex-col h-[400px] shadow-2xl overflow-hidden">
+          <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
+            <div className="flex items-center gap-2">
+              <BarChart3 size={14} className="text-[#00BFA5]" />
+              <span className="text-[10px] font-black uppercase tracking-widest italic">Autonomous_Alpha_Stream</span>
             </div>
-            <div ref={terminalRef} className="flex-1 overflow-y-auto scrollbar-hide font-mono text-[9px] space-y-0.5">
-               {(terminalLogs || []).slice(-30).map((l, i) => (
-                 <div key={i} className="flex gap-2">
-                   <span className="text-[#0091EA] opacity-40">{new Date().toLocaleTimeString()}</span>
-                   <span className={l.includes('[SUCCESS]') ? 'text-[#00BFA5]' : 'text-slate-400'}>{l}</span>
-                 </div>
-               ))}
+            <div className="flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/5">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#00BFA5] animate-pulse" />
+              <span className="text-[8px] font-black uppercase">Enclave_Scanning</span>
             </div>
-         </div>
+          </div>
+          <div className="flex-1 p-4">
+            <PnLChart data={pnlHistory} />
+          </div>
+          <div className="px-4 py-2 border-t border-white/5 bg-black/20 flex items-center gap-2">
+            <Info size={10} className="text-[#0091EA]" />
+            <span className="text-[7px] text-slate-600 font-bold uppercase tracking-widest">
+              LLM Risk Adjustment active (Gemini 2.0 Flash). Deterministic safety rails verified.
+            </span>
+          </div>
+        </div>
+
+        {/* Terminal */}
+        <div className="h-40 bg-[#11141D] border border-white/5 rounded-lg p-3 flex flex-col overflow-hidden">
+          <div className="flex items-center gap-2 mb-2 border-b border-white/5 pb-1">
+            <TerminalIcon size={12} className="text-[#00BFA5]" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Enclave_Tracing</span>
+          </div>
+          <div ref={terminalRef} className="flex-1 overflow-y-auto scrollbar-hide font-mono text-[9px] space-y-0.5">
+            {(terminalLogs || []).slice(-30).map((l, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="text-[#0091EA] opacity-40">{new Date().toLocaleTimeString()}</span>
+                <span className={l.includes('[SUCCESS]') ? 'text-[#00BFA5]' : 'text-slate-400'}>{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

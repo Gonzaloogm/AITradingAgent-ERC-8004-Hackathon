@@ -3,6 +3,8 @@ import { useAgentStatus } from '../hooks/useAgentStatus';
 import { useWallet } from '../hooks/useWallet';
 import { apiClient } from '../api/client';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import StrategicInquiry from '../components/agent/StrategicInquiry';
+import { toast } from 'sonner';
 import { Activity, Terminal as TerminalIcon, Gauge, Play, Square, ShieldAlert } from 'lucide-react';
 
 export default function ResultsPage() {
@@ -11,6 +13,7 @@ export default function ResultsPage() {
   const [terminalLogs, setTerminalLogs] = useState([]);
   const [isOperational, setIsOperational] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const terminalRef = useRef(null);
 
   // Sync isOperational with global status
@@ -51,17 +54,25 @@ export default function ResultsPage() {
     setIsStarting(true);
     const res = await apiClient.startStrategy();
     if (res.success) {
+      toast.success('Enclave rails engaged successfully');
       setIsOperational(true);
       refetchWallet();
+    } else {
+      toast.error('Engagement failed: ' + res.error);
     }
     setIsStarting(false);
   };
 
   const handleStop = async () => {
+    setIsStopping(true);
     const res = await apiClient.stopStrategy();
     if (res.success) {
+      toast.info('Autonomous strategy terminated');
       setIsOperational(false);
+    } else {
+      toast.error('Termination failed: ' + res.error);
     }
+    setIsStopping(false);
   };
 
   useEffect(() => {
@@ -80,7 +91,7 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fadein max-w-[1400px] mx-auto">
+    <div className="space-y-6 animate-fadein max-w-[1600px] mx-auto pb-10">
       
       {/* HEADER SECTION */}
       <div className="dashboard-card p-10 flex flex-col lg:flex-row justify-between items-center relative overflow-hidden">
@@ -110,10 +121,11 @@ export default function ResultsPage() {
           ) : (
             <button
               onClick={handleStop}
+              disabled={isStopping}
               className="flex items-center gap-2 px-8 py-3.5 rounded text-[10px] font-bold uppercase tracking-widest transition-all bg-rose-600/20 text-rose-500 border border-rose-500/30 hover:bg-rose-600/30 active:scale-95"
             >
-              <Square size={14} fill="currentColor" />
-              Terminate Strategy
+              {isStopping ? <LoadingSpinner size="sm" /> : <Square size={14} fill="currentColor" />}
+              {isStopping ? 'TERMINATING...' : 'Terminate Strategy'}
             </button>
           )}
 
@@ -139,31 +151,51 @@ export default function ResultsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* MAIN TERMINAL */}
-        <div className="lg:col-span-2 dashboard-card p-6 min-h-[500px] flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-             <div className="flex items-center gap-3">
-                <TerminalIcon size={16} className="text-[#0091EA]" />
-                <span className="text-xs font-bold text-white uppercase tracking-widest">Enclave Execution Trace</span>
-             </div>
-             <span className="text-[9px] font-black text-slate-500 px-2 py-0.5 border border-white/5 rounded lowercase">operational_logs</span>
-          </div>
-          <div className="flex-1 bg-black/30 rounded border border-white/5 p-6 overflow-hidden">
-             <div ref={terminalRef} className="h-full overflow-y-auto terminal-compact scrollbar-hide text-slate-400 font-mono">
-                {(terminalLogs || []).map((log, i) => (
-                   <div key={i} className="mb-2 flex gap-4 border-l border-white/5 pl-5 hover:bg-white/5 transition-colors group">
-                      <span className="text-[9px] opacity-10 group-hover:opacity-40 select-none">[{i.toString().padStart(3, '0')}]</span>
-                      <span className={`whitespace-pre-wrap text-[11px] ${log.includes('[SUCCESS]') ? 'text-[#00BFA5]' : log.includes('[WARN]') ? 'text-amber-500' : ''}`}>{log}</span>
-                   </div>
-                ))}
-                {!terminalLogs.length && <div className="text-slate-700 italic text-[11px]">Waiting for authority stream...</div>}
-             </div>
-          </div>
+        {/* LEFT COLUMN: MAIN OPS (2 COLUMNS) */}
+        <div className="lg:col-span-2 space-y-6">
+            {/* TERMINAL */}
+            <div className="dashboard-card p-6 h-[550px] flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <TerminalIcon size={16} className="text-[#0091EA]" />
+                        <span className="text-xs font-bold text-white uppercase tracking-widest">Enclave Execution Trace</span>
+                    </div>
+                    <span className="text-[9px] font-black text-slate-500 px-2 py-0.5 border border-white/5 rounded lowercase">operational_logs</span>
+                </div>
+                <div className="flex-1 bg-black/30 rounded border border-white/5 p-6 overflow-hidden">
+                    <div ref={terminalRef} className="h-full overflow-y-auto terminal-compact text-slate-400 font-mono scroll-smooth">
+                        {(terminalLogs || []).map((log, i) => (
+                        <div key={i} className="mb-2 flex gap-4 border-l border-white/5 pl-5 hover:bg-white/5 transition-colors group">
+                            <span className="text-[9px] opacity-10 group-hover:opacity-40 select-none">[{i.toString().padStart(3, '0')}]</span>
+                            <span className={`whitespace-pre-wrap text-[11px] ${log.includes('[SUCCESS]') ? 'text-[#00BFA5]' : log.includes('[WARN]') ? 'text-amber-500' : ''}`}>{log}</span>
+                        </div>
+                        ))}
+                        {!terminalLogs.length && <div className="text-slate-700 italic text-[11px]">Waiting for authority stream...</div>}
+                    </div>
+                </div>
+            </div>
+            
+            {/* PLATFORM INTEGRITY CARD */}
+            <div className="dashboard-card p-6 flex items-center justify-between bg-gradient-to-r from-transparent to-[#00BFA5]/5">
+                <div className="flex items-center gap-6">
+                    <ShieldAlert size={32} className="text-[#00BFA5] opacity-40" />
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-white font-black uppercase tracking-[0.2em]">INTEL_TDX_SECURE_ENCLAVE</span>
+                        <p className="text-[9px] text-slate-500 mt-1 uppercase tracking-widest font-bold">Hardware-Attested Execution Environment</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 border border-[#00BFA5]/20 rounded bg-[#00BFA5]/5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#00BFA5] animate-pulse" />
+                    <span className="text-[9px] font-black text-[#00BFA5]">ATTESTATION_VALID</span>
+                </div>
+            </div>
         </div>
 
-        {/* SIDEBAR */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="dashboard-card p-6">
+        {/* RIGHT COLUMN: ANALYTICS & CHAT (1 COLUMN) */}
+        <div className="lg:col-span-1 space-y-6 h-full flex flex-col">
+          
+          {/* RESOURCE MONITORING */}
+          <div className="dashboard-card p-6 flex-shrink-0">
              <div className="flex items-center gap-3 mb-8">
                 <Gauge size={16} className="text-[#00BFA5]" />
                 <span className="text-xs font-bold text-white uppercase tracking-widest">Resource Monitoring</span>
@@ -194,16 +226,11 @@ export default function ResultsPage() {
              </div>
           </div>
 
-          <div className="dashboard-card p-8 flex flex-col items-center justify-center text-center space-y-4">
-             <ShieldAlert size={48} className="text-[#00BFA5] opacity-20" />
-             <div>
-                <span className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Platform Integrity</span>
-                <p className="text-[10px] text-[#00BFA5] font-black mt-1">INTEL_TDX_VERIFIED</p>
-             </div>
-             <p className="text-[10px] text-slate-600 leading-relaxed max-w-[200px]">
-                Hardware root-of-trust validated via PCCS certification. System remains in isolated enclave.
-             </p>
+          {/* STRATEGIC INQUIRY HUB (CHAT) */}
+          <div className="flex-1 min-h-[450px] relative">
+             <StrategicInquiry />
           </div>
+
         </div>
 
       </div>

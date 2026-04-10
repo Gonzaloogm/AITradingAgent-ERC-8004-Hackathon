@@ -375,14 +375,22 @@ class DeltaNeutralEngine(BaseAgent):
                     timeout=4.0
                 )
                 
-                raw = response.text.strip()
-                # Clean markdown
-                if "```json" in raw:
-                    raw = raw.split("```json")[-1].split("```")[0].strip()
-                elif "```" in raw:
-                    raw = raw.split("```")[-1].split("```")[0].strip()
+                data_text = response.text.strip()
                 
-                data = json.loads(raw)
+                # STRIKER: Robust Markdown Scrubbing (Fixes "```json" unterminated string errors)
+                cleaned_text = data_text.replace('```json', '').replace('```', '').strip()
+                
+                try:
+                    data = json.loads(cleaned_text)
+                except json.JSONDecodeError:
+                    # Fallback: Try regex-like extraction if simple replace fails
+                    import re
+                    match = re.search(r'\{.*\}', cleaned_text, re.DOTALL)
+                    if match:
+                        data = json.loads(match.group())
+                    else:
+                        raise ValueError("No valid JSON found in AI response")
+
                 threshold = float(data["required_spread_threshold"])
                 
                 # Update last threshold for telemetry
@@ -688,7 +696,10 @@ class DeltaNeutralEngine(BaseAgent):
         print(f"[OK] Connected to L2 network. Current block: {w3_client.eth.block_number}")
 
         # NOTE: Replace with the real Risk Router address provided by LabLab
-        risk_router_address = w3_client.to_checksum_address("0x0000000000000000000000000000000000000000")
+        # Current placeholder — engine will log an error if this is zero address.
+        risk_router_address = w3_client.to_checksum_address(
+            os.getenv("RISK_ROUTER_ADDRESS", "0x0000000000000000000000000000000000000000")
+        )
 
         # Standard ABI for the hackathon. Update with the official ABI if it has more parameters.
         risk_router_abi = [
@@ -736,26 +747,52 @@ class DeltaNeutralEngine(BaseAgent):
             # Convert hex signature string -> raw bytes (ABI type is `bytes`)
             signature_bytes = bytes.fromhex(signature.replace("0x", ""))
 
+            # EIP-1559 gas fees — read from latest block (web3.py v6+ compatible)
+            try:
+                latest_block = w3_client.eth.get_block("latest")
+                base_fee = latest_block.get("baseFeePerGas", None)
+                if base_fee:
+                    max_priority = w3_client.to_wei(1, "gwei")
+                    max_fee = base_fee * 2 + max_priority
+                    gas_params = {
+                        "maxFeePerGas": max_fee,
+                        "maxPriorityFeePerGas": max_priority,
+                        "type": 2,
+                    }
+                else:
+                    # Chain doesn't support EIP-1559 — use legacy
+                    gas_params = {"gasPrice": w3_client.eth.gas_price}
+            except Exception:
+                gas_params = {"gasPrice": w3_client.eth.gas_price}
+
             tx = router_contract.functions.executeTrade(
                 intent_tuple,
                 signature_bytes
             ).build_transaction({
-                'from':     wallet_address,
-                'nonce':    nonce,
-                'gas':      500000,
-                'gasPrice': w3_client.eth.gas_price
+                'from':  wallet_address,
+                'nonce': nonce,
+                'gas':   500000,
+                **gas_params,
             })
 
             # 4. Sign the transaction with the isolated TEE key
             signed_tx = w3_client.eth.account.sign_transaction(tx, private_key=self._tee_auth.private_key)
 
-            print("[OK] Transaction built and signed. Ready for broadcast.")
+            print("[OK] Transaction built and signed. Broadcasting to Base Sepolia...")
 
-            # 5. Broadcast (commented out until the real contract address is set)
-            # tx_hash = w3_client.eth.send_raw_transaction(signed_tx.raw_transaction)
-            # print(f"[OK] Transaction submitted to Risk Router. Hash: {w3_client.to_hex(tx_hash)}")
+            # 5. Broadcast — LIVE MODE (disable only if Risk Router address is zero)
+            if risk_router_address == w3_client.to_checksum_address("0x0000000000000000000000000000000000000000"):
+                print("[WARN] RISK_ROUTER_ADDRESS is zero address. Skipping broadcast.")
+                print("[WARN] Set RISK_ROUTER_ADDRESS env var or provide it via the hackathon organiser.")
+            else:
+                tx_hash = w3_client.eth.send_raw_transaction(signed_tx.raw_transaction)
+                tx_hex  = w3_client.to_hex(tx_hash)
+                basescan_url = f"https://sepolia.basescan.org/tx/{tx_hex}"
+                print(f"[OK] ✅ Transaction submitted to Risk Router.")
+                print(f"[OK] TX Hash  : {tx_hex}")
+                print(f"[OK] BaseScan : {basescan_url}")
+                self.log(f"[TX_BROADCAST] {tx_hex} | {basescan_url}")
 
-            print("[INFO] Simulation complete. Set the real Risk Router address to broadcast.")
             print("-" * 50)
 
         except Exception as e:
@@ -767,22 +804,7 @@ class DeltaNeutralEngine(BaseAgent):
     async def run_loop(self):
         print("[INFO] Starting Global Delta-Neutral Engine (Strykr Intelligence Pack)")
         
-        # --- Standby Phase: Wait for registration and funding ---
-        while not self.is_activated:
-            balance = self.get_available_capital()
-            if balance >= self.min_activation_balance:
-                self.log(f"[AUTO-ACTIVATION] Sufficient liquidity detected ({balance} ETH). Engaging rails...")
-                self.is_activated = True
-                break
-
-            msg = f"[STRATEGY] Standby: Waiting for TEE funding... (Current: {balance} ETH / Required: {self.min_activation_balance})"
-            if not self.short_term_memory or self.short_term_memory[-1] != msg:
-                print(msg)
-                self.short_term_memory.append(msg)
-                if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
-            await asyncio.sleep(2)
-
-        print("[STRATEGY] Core activated. Starting scanning loop...")
+        self.log("[STRATEGY] Core activated. Starting scanning loop...")
         self.short_term_memory.append("[STRATEGY] Enclave Core activated. Initiating market scan.")
         if len(self.short_term_memory) > 5: self.short_term_memory.pop(0)
 

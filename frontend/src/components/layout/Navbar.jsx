@@ -5,7 +5,7 @@ import { formatAddress } from '../../utils/formatters';
 import { ShieldCheck, Activity, Wallet, Search } from 'lucide-react';
 
 const navLinks = [
-  { to: '/',          label: 'Dashboard',      icon: <Activity size={14} /> },
+  { to: '/dashboard', label: 'Dashboard',      icon: <Activity size={14} /> },
   { to: '/results',   label: 'Live Ops',       icon: <Search size={14} /> },
   { to: '/liquidity', label: 'Liquidity',      icon: <Wallet size={14} /> },
   { to: '/audit',     label: 'Security Audit', icon: <ShieldCheck size={14} /> },
@@ -32,9 +32,14 @@ export default function Navbar() {
 
   return (
     <nav className="sticky-header flex items-center justify-between px-10 mb-8 shadow-sm">
-      {/* Brand - Minimalism */}
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded bg-gradient-to-br from-[#0091EA] to-[#00BFA5] shadow-lg shadow-cyan-500/20" />
+      {/* Brand – CogniTEE Logo */}
+      <div className="flex items-center gap-3">
+        <img
+          src="/logo2.jpg"
+          alt="CogniTEE"
+          className="h-9 w-auto object-contain rounded"
+          style={{ filter: 'brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(180deg)' }}
+        />
         <span className="text-white font-bold tracking-tight text-base uppercase">Striker</span>
       </div>
 
@@ -44,7 +49,7 @@ export default function Navbar() {
           <NavLink
             key={link.to}
             to={link.to}
-            end={link.to === '/'}
+            end={link.to === '/dashboard'}
             className={({ isActive }) =>
               `flex items-center gap-2 px-6 h-[60px] text-[10px] font-semibold uppercase tracking-wider transition-all duration-300 transform ${
                 isActive

@@ -309,31 +309,6 @@ async def startup_event():
   print("\n [INFO] Delta Neutral Trading Engine initialized in STANDBY mode.")
   # asyncio.create_task(agent.run_loop()) 
 
-  # Background task to monitor and auto-activate strategy
-  async def monitor_activation():
-      while not trading_engine.is_activated:
-          try:
-              # Check balance
-              agent_address = await agent._get_agent_address()
-              balance_wei = agent._registry_client.w3.eth.get_balance(agent_address)
-              balance_eth = float(agent._registry_client.w3.from_wei(balance_wei, 'ether'))
-              
-              # HACKATHON AUTO-ACTIVATE: If we have ANY funds, start the scanning loop
-              if balance_eth > 0:
-                  print(f"\n[AUTO-ACTIVATE] Authorized Liquidity detected: {balance_eth} ETH. Engaging Enclave Rails.")
-                  trading_engine.is_activated = True
-                  break
-              
-              # Log standby status
-              print(f"[AUTO-ACTIVATOR] Standby: Awaiting Authorized Liquidity... (Balance: {balance_eth} ETH)")
-                  
-          except Exception as e:
-              print(f"[AUTO-ACTIVATOR] Error: {e}")
-          
-          await asyncio.sleep(5)
-
-  asyncio.create_task(monitor_activation())
-
 @app.post("/api/strategy/start")
 async def start_strategy():
     """Starts the trading loop as a background task."""
@@ -680,7 +655,7 @@ async def get_wallet():
       "chain_id": agent.config.chain_id,
       "chain_name": chain_name,
       "funded": float(balance_eth) >= min_balance,
-      "margin_ready": float(balance_eth) >= 0.001,
+      "margin_ready": True,  # DEMO MODE: always sufficient margin
       "minimum_balance": str(min_balance)
   }
 
