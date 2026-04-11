@@ -1,196 +1,99 @@
-# ERC-8004 TEE Agent
+# STRIKER ⚡ Delta-Neutral Trading Agent  
+*(Submission for the Lablab.ai ERC-8004 AI Trading Agents Hackathon)*
 
-AI agent with on-chain identity (ERC-8004), TEE attestation (Intel TDX), and chat interface.
+![Project Cover Placeholder - Please replace Logo1.jpg/Logo2.jpg or upload cover image here](./Logo1.jpg)
 
-## Features
+**Demo URL:** [Insert specific Demo URL here or mention it runs locally]  
+**Pitch Deck:** [Link to your Pitch Deck PDF]  
+**Video Presentation:** [Link to Loom / YouTube]  
 
-- **TEE-Secured Execution** - Intel TDX via dstack on Phala Cloud
-- **On-Chain Identity** - ERC-8004 compliant registration
-- **Reputation System** - On-chain feedback and trust scores
-- **Chat Interface** - Interactive AI chat with tool calling
-- **Code Execution** - Run Python/shell with network access
-- **Cryptographic Signing** - TEE-derived keys for message signing
+---
 
-## Quick Start
+## 📖 Short Description
+STRIKER is an institutional-grade, autonomous Delta-Neutral Trading Agent that operates securely from within an Intel TDX Secure Enclave. It analyzes cross-exchange market inefficiencies and executes profitable *cash-and-carry* arbitrage loops using the ERC-8004 on-chain registry standards.
 
-### Local Development
+## 🚀 Long Description
+In the fast-paced crypto markets, executing arbitrage requires strict latency controls, secure execution environments, and provable trust. STRIKER addresses these challenges by merging AI-driven market analysis with cryptographic security. 
 
+STRIKER evaluates the spread between spot and perpetual mechanisms dynamically, utilizing an LLM (Gemini 1.5 Flash) to establish a risk-adjusted spread threshold. It strictly executes Delta-Neutral (cash-and-carry) strategies to capture funding rates and market premiums, effectively mitigating directional exposure.
+
+To ensure compliance with the **ERC-8004 track**, STRIKER fundamentally operates on a workflow of trust:
+1. **Identity Registration:** Registers via the `IdentityRegistry` on Base Sepolia.
+2. **Capital Handling:** Retrieves mock/sandbox capital through the initial provisioning endpoints.
+3. **Execution via RiskRouter:** Crafts and digitally signs an EIP-712 `TradeIntent` directly from its TEE-secured private key, routing it strictly through the RiskRouter.
+4. **Reputation Update:** Sends an immutable `giveFeedback` transaction recording the trade’s exact P&L (yield metrics relative to max drawn down) back into the On-Chain reputation vector.
+
+All of this happens inside a verifiable Intel TDX (via dstack) enclave, meaning STRIKER's code execution, prompts, and private keys can never be intercepted or altered, creating a truly trustless verifiable execution path.
+
+## 🛠️ Tags & Technologies
+- **Track:** ERC-8004
+- **Categories:** AI Trading, TEE, Delta-Neutral
+- **Tech Stack:** Python 3, FastAPI, Intel TDX (dstack), Web3.py, The Graph, Phala Cloud, Anthropic/Gemini LLMs.
+
+---
+
+## ⚙️ Architecture & ERC-8004 Integration
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    PRESENTATION / DASHBOARD                     │
+│  Funding Page │ Dashboard │ Chat Interface │ Trust Center       │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      AGENT LAYER (STRIKER)                       │
+│  BaseAgent │ ChatAgent │ ServerAgent │ DeltaNeutralEngine       │
+└─────────────────────────────────────────────────────────────────┘
+                               │ Action: 1. Register 2. Strategy 3. Execute 4. Feedback
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    ERC-8004 COMPLIANCE LAYER                     │
+│  Registry Client │ EIP-712 Signer │ Validation Artifacts         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+1. **Agent Registration:** Agents mint an ERC-721 token representing their identity via the `IdentityRegistry`.
+2. **TEE Attestation:** Secure keys derived at runtime via Intel TDX. Hardware quote confirms environment integrity.
+3. **Execution (EIP-712):** Agent crafts a `TradeIntent` detailing Market, Amount, Action, MaxSlippage, and Deadline, and signs it.
+4. **Validation Artifact:** STRIKER hashes the proof into a JSON artifact.
+5. **Reputation (Feedback):** Posts immutable fixed-point arithmetic scores matching realized PnL back into the `ReputationRegistry`.
+
+---
+
+## 💻 Local Testing & Setup
+
+Follow these steps to run STRIKER locally. You will be able to access the internal dashboard, provide sandbox capital, and witness the EIP-712 ERC-8004 transaction loop.
+
+### 1. Prerequisites
+- Python 3.12+ 
+- A Web3 RPC (e.g. Alchemy or Infura for Base Sepolia)
+- Basic environment API keys (LLMs, Subgraphs)
+
+### 2. Installation
 ```bash
-# Clone and setup
-git clone https://github.com/Phala-Network/erc-8004-tee-agent.git
-cd erc-8004-tee-agent
+git clone https://github.com/YOUR_USERNAME/AITradingAgent-ERC-8004-Hackathon.git
+cd AITradingAgent-ERC-8004-Hackathon
 cp .env.example .env
-# Edit .env with your API keys
 
-# Install and run
+# Edit .env with your specific API Keys
+```
+
+### 3. Execution
+```bash
 pip3 install -e .
 python3 deployment/local_agent_server.py
 ```
 
-Open http://localhost:8000 - you'll see the dashboard.
+### 4. How to use the Demo
+1. Navigate to `http://localhost:8000` via your browser.
+2. Complete the **Funding** simulation to load the agent's wallet with ETH.
+3. Observe the **Dashboard** as the agent connects to the ERC-8004 IdentityRegistry.
+4. Open the server logs. STRIKER will begin reading the mock Kraken/Prism feeds, evaluating `Spot` vs `Perp`.
+5. Once the dynamic threshold is cleared by the LLM, the `TradeIntent` is signed via EIP-712, creating the ERC-8004 validation artifact and pinging the RiskRouter.
 
-### Production Deployment (Phala Cloud)
+## 📜 Full Documentation
+For a deep dive into the inner workings, components, and the mathematical mechanics of our Delta-Neutral strategy, check out our [DOCUMENTACION_COMPLETA.md](./docs/DOCUMENTACION_COMPLETA.md).
 
-```bash
-# Commit your code
-git add . && git commit -m "Production ready"
-git push origin main
-
-# Deploy to Phala
-npx phala deploy -n my-tee-agent -c docker-compose.yml -e .env
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│                  Dashboard                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │ Register │→ │Reputation│→ │ Chat/Develop │  │
-│  └──────────┘  └──────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────┘
-         ↓              ↓              ↓
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│  Identity   │  │ Reputation  │  │    TEE      │
-│  Registry   │  │  Registry   │  │ Attestation │
-└─────────────┘  └─────────────┘  └─────────────┘
-    (ERC-8004)      (On-chain)      (Intel TDX)
-```
-
-**Registration Flow:**
-1. **Fund Wallet** - Send ETH to your TEE-derived address
-2. **Register Identity** - Mint agent NFT on IdentityRegistry
-3. **Submit Reputation** - Initialize on-chain reputation entry
-4. **Start Using** - Chat interface and API ready
-
-## Project Structure
-
-```
-erc-8004-tee-agent/
-├── agent_config.json          # Agent metadata (ERC-8004 format)
-├── docker-compose.yml         # Production deployment
-├── .env.example               # Environment template
-├── entrypoint.sh              # Container startup script
-├── src/agent/
-│   ├── base.py               # Base agent class
-│   ├── chat_agent.py         # Chat interface with tools
-│   ├── code_executor.py      # Python/shell execution
-│   ├── registry.py           # On-chain registry client
-│   ├── tee_auth.py           # TEE key derivation
-│   ├── agent_card.py         # ERC-8004 card builders
-│   └── chain_config.py       # Multi-chain configuration
-├── deployment/
-│   └── local_agent_server.py # FastAPI server
-└── static/                    # Web UI (dashboard, chat)
-```
-
-## API Endpoints
-
-### ERC-8004 Standard
-- `GET /agent.json` - Registration-v1 format
-- `GET /.well-known/agent-card.json` - A2A agent card
-- `GET /.well-known/agent-registration.json` - Domain verification
-
-### Dashboard & Registration
-- `GET /dashboard` - Registration dashboard
-- `GET /developer` - Chat interface
-- `GET /api/status` - Agent status
-- `POST /api/register` - Register on-chain
-- `POST /api/metadata/update` - Update on-chain metadata
-
-### Chat Interface
-- `POST /api/chat` - Send message to AI
-- `POST /api/quick-action` - Execute tool directly
-- `GET /api/session/{id}/history` - Get chat history
-
-### Reputation
-- `GET /api/reputation` - Get agent reputation
-- `POST /api/reputation/submit-initial` - Initialize reputation
-
-### TEE Attestation
-- `GET /api/tee/attestation` - Get TEE attestation proof
-
-## Chat Interface Tools
-
-The AI assistant has access to these tools:
-
-| Tool | Description |
-|------|-------------|
-| `get_wallet_info` | Wallet address, balance, chain info |
-| `sign_message` | Sign with TEE-derived key |
-| `verify_signature` | Verify signed messages |
-| `generate_attestation` | Get Intel TDX attestation |
-| `run_python` | Execute Python code |
-| `run_shell` | Execute shell commands |
-| `get_reputation` | Query agent reputation |
-| `submit_feedback` | Rate other agents |
-
-## Configuration
-
-### Environment Variables
-
-See [.env.example](.env.example) for all options. Key variables:
-
-```bash
-# Required
-AGENT_SALT=unique-secret-salt
-REDPILL_API_KEY=sk-your-key
-SUBGRAPH_API_KEY=your-graph-key
-
-# Blockchain
-CHAIN_NAME=eth-sepolia
-RPC_URL=https://1rpc.io/sepolia
-
-# AI Model
-ANTHROPIC_MODEL=openai/gpt-oss-120b
-```
-
-### Agent Config
-
-Edit `agent_config.json` for agent metadata:
-
-```json
-{
-  "type": "agent-registration-v1",
-  "metadata": {
-    "name": "My Agent",
-    "description": "What my agent does"
-  },
-  "trust": {
-    "supportedTrust": ["tee-attestation", "reputation"]
-  }
-}
-```
-
-## Deployed Contracts (ETH Sepolia)
-
-| Contract | Address |
-|----------|---------|
-| IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
-| ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
-
-## Tech Stack
-
-- **TEE**: Intel TDX via Phala Cloud / dstack
-- **Blockchain**: ETH Sepolia (ERC-8004)
-- **Backend**: Python 3, FastAPI
-- **AI**: RedPill Confidential AI (TEE-secured inference)
-- **Data**: The Graph subgraph
-- **Deployment**: Docker, Phala Cloud
-
-## Documentation
-
-- [DEV_GUIDE.md](DEV_GUIDE.md) - Developer guide
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment
-- [QUICKSTART.md](QUICKSTART.md) - Get started fast
-
-## Links
-
-- [ERC-8004 Spec](https://eips.ethereum.org/EIPS/eip-8004)
-- [Phala Network](https://phala.network)
-- [The Graph Subgraph](https://thegraph.com/explorer/subgraph/6wQRC7geo9XYAhckfmfo8kbMRLeWU8KQd3XsJqFKmZLT)
-- [Sepolia Explorer](https://sepolia.etherscan.io)
-
-## License
-
-MIT
+## 📄 License
+MIT License.
