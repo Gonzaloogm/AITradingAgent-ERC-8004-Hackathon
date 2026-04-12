@@ -5,7 +5,7 @@ const PHALA_URL = 'https://d571a329e5081e0d1b8fd65773ba0cd84e9e3457-8000.dstack-
 
 export class APIClient {
   constructor() {
-    this.baseURL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+    this.baseURL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8000' : '');
   }
 
   async request(endpoint, options = {}) {
@@ -42,20 +42,20 @@ export class APIClient {
     }
   }
 
-  get(endpoint)           { return this.request(endpoint, { method: 'GET' }); }
-  post(endpoint, body={}) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); }
+  get(endpoint) { return this.request(endpoint, { method: 'GET' }); }
+  post(endpoint, body = {}) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); }
 
-  getChainConfig()               { return this.get('/api/chain-config'); }
-  getWallet()                    { return this.get('/api/wallet'); }
-  getStatus()                    { return this.get('/api/status'); }
-  registerAgent()                { return this.post('/api/register'); }
-  signMessage(message)           { return this.post('/api/sign', { message }); }
-  getAttestation()               { return this.get('/api/attestation'); }
-  getTransactionStatus(txHash)   { return this.get(`/api/transaction/${txHash}/status`); }
-  submitInitialReputation()      { return this.post('/api/reputation/submit-initial'); }
-  getReputation(agentId = null)  { return this.get(agentId ? `/api/reputation/${agentId}` : '/api/reputation'); }
-  getAgentCard()                 { return this.get('/agent.json'); }
-  getAgentState()                { return this.get('/api/agent-state'); }
+  getChainConfig() { return this.get('/api/chain-config'); }
+  getWallet() { return this.get('/api/wallet'); }
+  getStatus() { return this.get('/api/status'); }
+  registerAgent() { return this.post('/api/register'); }
+  signMessage(message) { return this.post('/api/sign', { message }); }
+  getAttestation() { return this.get('/api/attestation'); }
+  getTransactionStatus(txHash) { return this.get(`/api/transaction/${txHash}/status`); }
+  submitInitialReputation() { return this.post('/api/reputation/submit-initial'); }
+  getReputation(agentId = null) { return this.get(agentId ? `/api/reputation/${agentId}` : '/api/reputation'); }
+  getAgentCard() { return this.get('/agent.json'); }
+  getAgentState() { return this.get('/api/agent-state'); }
 
   async sendChatMessage(sessionId, message) {
     return this.post('/api/chat', { session_id: sessionId, message });
@@ -74,7 +74,7 @@ export class APIClient {
   }
 
   startStrategy() { return this.post('/api/strategy/start'); }
-  stopStrategy()  { return this.post('/api/strategy/stop'); }
+  stopStrategy() { return this.post('/api/strategy/stop'); }
 }
 
 export const apiClient = new APIClient();
