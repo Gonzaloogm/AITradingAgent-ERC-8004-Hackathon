@@ -1,0 +1,17 @@
+{
+  "execution": {
+    "signature": "61901b937b31c611352958ef3973547b61ca3b0ccd3c473daea957ab3560bf8f3343b0c8cf251b41440dbf7a9a68a89f379dea9e6520f0cde088af97e3d843a51b",
+    "trade_intent": {
+      "action": "LONG_SPOT_SHORT_PERP",
+      "agentId": 1,
+      "amount": 4999982238462537,
+      "deadline": 1776005420,
+      "market": "SOL",
+      "maxSlippageBps": 50,
+      "timestamp": 1776005120
+    }
+  },
+  "protocol": "ERC-8004",
+  "registry": "ValidationRegistry",
+  "timestamp": 1776005120
+}
