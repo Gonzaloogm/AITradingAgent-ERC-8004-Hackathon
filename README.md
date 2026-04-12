@@ -11,22 +11,11 @@
 
 ## 📖 Short Description
 
-STRIKER is an institutional-grade, autonomous Delta-Neutral Trading Agent that operates securely from within an Intel TDX Secure Enclave. It analyzes cross-exchange market inefficiencies and executes profitable *cash-and-carry* arbitrage loops using the ERC-8004 on-chain registry standards.
+Autonomous ERC-8004 AI agent using Intel TDX for secure, verifiable Delta-Neutral trading on Base.
 
 ## 🚀 Long Description
 
-In the fast-paced crypto markets, executing arbitrage requires strict latency controls, secure execution environments, and provable trust. STRIKER addresses these challenges by merging AI-driven market analysis with cryptographic security.
-
-STRIKER evaluates the spread between spot and perpetual mechanisms dynamically, utilizing an LLM (Gemini 1.5 Flash) to establish a risk-adjusted spread threshold. It strictly executes Delta-Neutral (cash-and-carry) strategies to capture funding rates and market premiums, effectively mitigating directional exposure.
-
-To ensure compliance with the **ERC-8004 track**, STRIKER fundamentally operates on a workflow of trust:
-
-1. **Identity Registration:** Registers via the `IdentityRegistry` on Base Sepolia.
-2. **Capital Handling:** Retrieves mock/sandbox capital through the initial provisioning endpoints.
-3. **Execution via RiskRouter:** Crafts and digitally signs an EIP-712 `TradeIntent` directly from its TEE-secured private key, routing it strictly through the RiskRouter.
-4. **Reputation Update:** Sends an immutable `giveFeedback` transaction recording the trade’s exact P&L (yield metrics relative to max drawn down) back into the On-Chain reputation vector.
-
-All of this happens inside a verifiable Intel TDX (via dstack) enclave, meaning STRIKER's code execution, prompts, and private keys can never be intercepted or altered, creating a truly trustless verifiable execution path.
+STRIKER is a verifiable ERC-8004 AI agent for Delta-Neutral trading. Operating in an Intel TDX enclave, it pairs Gemini AI with hardware security for tamper-proof strategies. STRIKER captures spot-perp spreads via secure EIP-712 intents routed through the RiskRouter. By registering as an NFT and reporting immutable P&L to the ReputationRegistry, it builds a transparent trust score. STRIKER is the blueprint for intelligent, accountable, and secure autonomous finance on-chain.
 
 ## 🛠️ Tags & Technologies
 
